@@ -51,7 +51,8 @@ public class TestGVCF {
     List<String> list = ImmutableList.of("1,s,a,0|0", "2,s,a,1|1");
     JavaRDD<String> rdd = jsc.parallelize(list);
 
-    // bulk insert into HBase
+    // insert into HBase
+    // TODO: can we use bulkLoad for efficiency (need to port interface to Java)
     Configuration conf = testUtil.getConfiguration();
     JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, conf);
     hbaseContext.bulkPut(rdd, tableName, (Function<String, Put>) v -> {
