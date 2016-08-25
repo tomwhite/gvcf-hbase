@@ -113,6 +113,8 @@ public class TestGVCF implements Serializable {
     // TODO: can we use bulkLoad for efficiency (need to port interface to Java)
     hbaseContext.bulkPut(rdd, tableName, (Function<VariantLite, Put>) v -> {
       Put put = new Put(Bytes.toBytes(v.getStart()));
+      // note that we only store one genotype here as we expect to load single sample
+      // gvcf files
       byte[] qualifier = Bytes.toBytes(v.getGenotype().getSampleIndex());
       String val = v.getEnd() + "," + v.getGenotype().getValue(); // poor encoding!
       byte[] value = Bytes.toBytes(val);
