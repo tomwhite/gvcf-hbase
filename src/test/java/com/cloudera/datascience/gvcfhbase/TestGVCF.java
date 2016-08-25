@@ -82,7 +82,7 @@ public class TestGVCF implements Serializable {
     put(rdd2, tableName, hbaseContext);
 
     // Scan over all positions
-    List<String> allPositions = scanAllPositions(tableName, hbaseContext).collect();
+    List<String> allPositions = scan(tableName, hbaseContext, true).collect();
     //allPositions.forEach(System.out::println);
     List<String> expectedAllPositions = ImmutableList.of(
         "1,0|0(end=1),0|1(end=3)",
@@ -96,7 +96,7 @@ public class TestGVCF implements Serializable {
     assertEquals(expectedAllPositions, allPositions);
 
     // Scan over all variants
-    List<String> allVariants = scanAllVariants(tableName, hbaseContext).collect();
+    List<String> allVariants = scan(tableName, hbaseContext, false).collect();
     //allVariants.forEach(System.out::println);
     List<String> expectedAllVariants = ImmutableList.of(
         "1,0|0(end=1),0|1(end=3)",
@@ -120,61 +120,8 @@ public class TestGVCF implements Serializable {
     });
   }
 
-  public JavaRDD<String> scanAllPositions(TableName tableName, JavaHBaseContext 
-      hbaseContext) {
-    Scan scan = new Scan();
-    scan.setCaching(100);
-    return hbaseContext.hbaseRDD(tableName, scan)
-        .mapPartitions((FlatMapFunction<Iterator<Tuple2<ImmutableBytesWritable,
-            Result>>, String>) rows -> {
-          List<String> output = new ArrayList<>();
-          List<VariantLite> variantsBySampleIndex = new ArrayList<>();
-          int numSamples = -1;
-          while (rows.hasNext()) {
-            Tuple2<ImmutableBytesWritable, Result> row = rows.next();
-            Result result = row._2();
-            if (numSamples == -1) { // determine number of samples from first row,
-              // since they all have an entry there
-              numSamples = result.listCells().size();
-              variantsBySampleIndex = Arrays.asList(new VariantLite[numSamples]);
-            }
-            int start = Bytes.toInt(result.getRow());
-            for (Cell cell : result.listCells()) {
-              int sampleIndex = Bytes.toInt(cell.getQualifierArray(),
-                  cell.getQualifierOffset(), cell.getQualifierLength());
-              String val = Bytes.toString(cell.getValueArray(), cell.getValueOffset(),
-                  cell.getValueLength());
-              String[] splits = val.split(",");
-              int end = Integer.parseInt(splits[0]);
-              GenotypeLite genotype = new GenotypeLite(sampleIndex, splits[1]);
-              VariantLite variant = new VariantLite(start, end, genotype);
-              variantsBySampleIndex.set(sampleIndex, variant);
-            }
-            int nextEnd = Integer.MAX_VALUE; // how many positions we can iterate over
-            // before the next row
-            for (VariantLite variant : variantsBySampleIndex) {
-              nextEnd = Math.min(variant.getEnd(), nextEnd);
-            }
-
-            for (int pos = start; pos <= nextEnd; pos++) {
-              StringBuilder sb = new StringBuilder();
-              sb.append(pos).append(",");
-              for (VariantLite variant : variantsBySampleIndex) {
-                GenotypeLite genotype = variant.getGenotype();
-                sb.append(genotype.getValue());
-                sb.append("(end=").append(variant.getEnd()).append(")");
-                sb.append(",");
-              }
-              sb.deleteCharAt(sb.length() - 1);
-              output.add(sb.toString());
-            }
-          }
-          return output;
-        });
-  }
-
-  public JavaRDD<String> scanAllVariants(TableName tableName, JavaHBaseContext
-      hbaseContext) {
+  public JavaRDD<String> scan(TableName tableName, JavaHBaseContext
+      hbaseContext, boolean allPositions) {
     Scan scan = new Scan();
     scan.setCaching(100);
     return hbaseContext.hbaseRDD(tableName, scan)
@@ -213,7 +160,20 @@ public class TestGVCF implements Serializable {
               nextEnd = Math.min(variant.getEnd(), nextEnd);
             }
 
-            if (isVariantPos) {
+            if (allPositions) {
+              for (int pos = start; pos <= nextEnd; pos++) {
+                StringBuilder sb = new StringBuilder();
+                sb.append(pos).append(",");
+                for (VariantLite variant : variantsBySampleIndex) {
+                  GenotypeLite genotype = variant.getGenotype();
+                  sb.append(genotype.getValue());
+                  sb.append("(end=").append(variant.getEnd()).append(")");
+                  sb.append(",");
+                }
+                sb.deleteCharAt(sb.length() - 1);
+                output.add(sb.toString());
+              }
+            } else if (isVariantPos) {
               StringBuilder sb = new StringBuilder();
               sb.append(start).append(",");
               for (VariantLite variant : variantsBySampleIndex) {
