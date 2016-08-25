@@ -111,7 +111,8 @@ public class TestGVCF implements Serializable {
 
   public void put(JavaRDD<VariantLite> rdd, TableName tableName, JavaHBaseContext
       hbaseContext, int splitSize) {
-    // TODO: how to break variants into two that span the split boundary?
+    // TODO: how to break variants into two that span the split boundary? (may need to
+    // write own bulkPut with a flatmap over puts
     // TODO: can we use bulkLoad for efficiency (need to port interface to Java)
     hbaseContext.bulkPut(rdd, tableName, (Function<VariantLite, Put>) v -> {
       Put put = new Put(Bytes.toBytes(v.getStart()));
