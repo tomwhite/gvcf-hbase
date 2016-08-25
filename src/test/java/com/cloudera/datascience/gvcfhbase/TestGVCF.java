@@ -22,6 +22,7 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
+import org.apache.spark.api.java.function.Function2;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -82,7 +83,7 @@ public class TestGVCF implements Serializable {
     put(rdd2, tableName, hbaseContext);
 
     // Scan over all positions
-    List<String> allPositions = scan(tableName, hbaseContext, true).collect();
+    List<String> allPositions = scan(tableName, hbaseContext, true, TestGVCF::process).collect();
     //allPositions.forEach(System.out::println);
     List<String> expectedAllPositions = ImmutableList.of(
         "1,0|0(end=1),0|1(end=3)",
@@ -96,7 +97,7 @@ public class TestGVCF implements Serializable {
     assertEquals(expectedAllPositions, allPositions);
 
     // Scan over variants only
-    List<String> allVariants = scan(tableName, hbaseContext, false).collect();
+    List<String> allVariants = scan(tableName, hbaseContext, false, TestGVCF::process).collect();
     //allVariants.forEach(System.out::println);
     List<String> expectedAllVariants = ImmutableList.of(
         "1,0|0(end=1),0|1(end=3)",
@@ -120,14 +121,14 @@ public class TestGVCF implements Serializable {
     });
   }
 
-  public JavaRDD<String> scan(TableName tableName, JavaHBaseContext
-      hbaseContext, boolean allPositions) {
+  public <T> JavaRDD<T> scan(TableName tableName, JavaHBaseContext
+      hbaseContext, boolean allPositions, Function2<Integer, Iterable<VariantLite>, T> f) {
     Scan scan = new Scan();
     scan.setCaching(100);
     return hbaseContext.hbaseRDD(tableName, scan)
         .mapPartitions((FlatMapFunction<Iterator<Tuple2<ImmutableBytesWritable,
-            Result>>, String>) rows -> {
-          List<String> output = new ArrayList<>();
+            Result>>, T>) rows -> {
+          List<T> output = new ArrayList<>();
           List<VariantLite> variantsBySampleIndex = new ArrayList<>();
           int numSamples = -1;
           while (rows.hasNext()) {
@@ -162,10 +163,10 @@ public class TestGVCF implements Serializable {
 
             if (allPositions) {
               for (int pos = start; pos <= nextEnd; pos++) {
-                output.add(process(pos, variantsBySampleIndex));
+                output.add(f.call(pos, variantsBySampleIndex));
               }
             } else if (isVariantPos) {
-              output.add(process(start, variantsBySampleIndex));
+              output.add(f.call(start, variantsBySampleIndex));
             }
           }
           return output;
