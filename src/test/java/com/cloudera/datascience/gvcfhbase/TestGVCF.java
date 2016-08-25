@@ -82,9 +82,8 @@ public class TestGVCF implements Serializable {
     put(rdd2, tableName, hbaseContext);
 
     // Scan over all positions
-    JavaRDD<String> result = scanAllPositions(tableName, hbaseContext);
-    List<String> collect = result.collect();
-    //collect.forEach(System.out::println);
+    List<String> allPositions = scanAllPositions(tableName, hbaseContext).collect();
+    //allPositions.forEach(System.out::println);
     List<String> expected = ImmutableList.of(
         "1,0|0(end=1),0|1(end=3)",
         "2,N/A(end=7),0|1(end=3)",
@@ -94,7 +93,7 @@ public class TestGVCF implements Serializable {
         "6,N/A(end=7),N/A(end=6)",
         "7,N/A(end=7),0|0(end=8)",
         "8,1|1(end=8),0|0(end=8)");
-    assertEquals(expected, collect);
+    assertEquals(expected, allPositions);
 
     testUtil.deleteTable(tableName);
   }
