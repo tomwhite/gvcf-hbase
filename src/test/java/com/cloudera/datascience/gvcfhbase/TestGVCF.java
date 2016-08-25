@@ -95,7 +95,7 @@ public class TestGVCF implements Serializable {
         "8,1|1(end=8),0|0(end=8)");
     assertEquals(expectedAllPositions, allPositions);
 
-    // Scan over all variants
+    // Scan over variants only
     List<String> allVariants = scan(tableName, hbaseContext, false).collect();
     //allVariants.forEach(System.out::println);
     List<String> expectedAllVariants = ImmutableList.of(
@@ -162,32 +162,27 @@ public class TestGVCF implements Serializable {
 
             if (allPositions) {
               for (int pos = start; pos <= nextEnd; pos++) {
-                StringBuilder sb = new StringBuilder();
-                sb.append(pos).append(",");
-                for (VariantLite variant : variantsBySampleIndex) {
-                  GenotypeLite genotype = variant.getGenotype();
-                  sb.append(genotype.getValue());
-                  sb.append("(end=").append(variant.getEnd()).append(")");
-                  sb.append(",");
-                }
-                sb.deleteCharAt(sb.length() - 1);
-                output.add(sb.toString());
+                output.add(process(pos, variantsBySampleIndex));
               }
             } else if (isVariantPos) {
-              StringBuilder sb = new StringBuilder();
-              sb.append(start).append(",");
-              for (VariantLite variant : variantsBySampleIndex) {
-                GenotypeLite genotype = variant.getGenotype();
-                sb.append(genotype.getValue());
-                sb.append("(end=").append(variant.getEnd()).append(")");
-                sb.append(",");
-              }
-              sb.deleteCharAt(sb.length() - 1);
-              output.add(sb.toString());
+              output.add(process(start, variantsBySampleIndex));
             }
           }
           return output;
         });
+  }
+
+  private static String process(int pos, Iterable<VariantLite> variants) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(pos).append(",");
+    for (VariantLite variant : variants) {
+      GenotypeLite genotype = variant.getGenotype();
+      sb.append(genotype.getValue());
+      sb.append("(end=").append(variant.getEnd()).append(")");
+      sb.append(",");
+    }
+    sb.deleteCharAt(sb.length() - 1);
+    return sb.toString();
   }
 
 }
