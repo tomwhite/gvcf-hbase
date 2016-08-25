@@ -83,6 +83,10 @@ public class TestGVCF {
       return put;
     });
 
+    // TODO: figure out how to scan over the data properly
+    // try using raw version of hbaseRDD, then call mapPartitions on it - this will
+    // allow us to keep a list of VariantContexts (one for each sample) as we iterate
+    // over the range
     // Read back into an RDD
     Scan scan = new Scan();
     scan.setCaching(100);
@@ -100,6 +104,7 @@ public class TestGVCF {
           }).collect(Collectors.toList());
           return new VariantLite(start, start, genotypes);
     });
+
 
     List<VariantLite> actualVariants = results.collect();
     assertEquals(gvcf1, actualVariants);
