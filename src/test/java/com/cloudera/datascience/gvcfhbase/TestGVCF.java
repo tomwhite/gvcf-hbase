@@ -81,12 +81,8 @@ public class TestGVCF implements Serializable {
     put(rdd1, tableName, hbaseContext);
     put(rdd2, tableName, hbaseContext);
 
-    // TODO: figure out how to scan over the data properly
-    // try using raw version of hbaseRDD, then call mapPartitions on it - this will
-    // allow us to keep a list of VariantContexts (one for each sample) as we iterate
-    // over the range
-    // Read back into an RDD
-    JavaRDD<String> result = scan(tableName, hbaseContext);
+    // Scan over all positions
+    JavaRDD<String> result = scanAllPositions(tableName, hbaseContext);
     List<String> collect = result.collect();
     //collect.forEach(System.out::println);
     List<String> expected = ImmutableList.of(
@@ -116,7 +112,8 @@ public class TestGVCF implements Serializable {
     });
   }
 
-  public JavaRDD<String> scan(TableName tableName, JavaHBaseContext hbaseContext) {
+  public JavaRDD<String> scanAllPositions(TableName tableName, JavaHBaseContext 
+      hbaseContext) {
     Scan scan = new Scan();
     scan.setCaching(100);
     return hbaseContext.hbaseRDD(tableName, scan)
