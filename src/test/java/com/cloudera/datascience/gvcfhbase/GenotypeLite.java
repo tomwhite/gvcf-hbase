@@ -3,16 +3,16 @@ package com.cloudera.datascience.gvcfhbase;
 import java.io.Serializable;
 
 public class GenotypeLite implements Serializable {
-  private String sampleName;
+  private int sampleIndex;
   private String value;
 
-  public GenotypeLite(String sampleName, String value) {
-    this.sampleName = sampleName;
+  public GenotypeLite(int sampleIndex, String value) {
+    this.sampleIndex = sampleIndex;
     this.value = value;
   }
 
-  public String getSampleName() {
-    return sampleName;
+  public int getSampleIndex() {
+    return sampleIndex;
   }
 
   public String getValue() {
@@ -26,14 +26,14 @@ public class GenotypeLite implements Serializable {
 
     GenotypeLite that = (GenotypeLite) o;
 
-    if (!sampleName.equals(that.sampleName)) return false;
+    if (sampleIndex != that.sampleIndex) return false;
     return value.equals(that.value);
 
   }
 
   @Override
   public int hashCode() {
-    int result = sampleName.hashCode();
+    int result = sampleIndex;
     result = 31 * result + value.hashCode();
     return result;
   }
@@ -41,7 +41,7 @@ public class GenotypeLite implements Serializable {
   @Override
   public String toString() {
     return "GenotypeLite{" +
-        "sampleName='" + sampleName + '\'' +
+        "sampleIndex=" + sampleIndex +
         ", value='" + value + '\'' +
         '}';
   }
