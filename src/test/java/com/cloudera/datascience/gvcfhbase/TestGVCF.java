@@ -79,8 +79,9 @@ public class TestGVCF implements Serializable {
 
     Configuration conf = testUtil.getConfiguration();
     JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, conf);
-    put(rdd1, tableName, hbaseContext);
-    put(rdd2, tableName, hbaseContext);
+    int splitSize = 4;
+    put(rdd1, tableName, hbaseContext, splitSize);
+    put(rdd2, tableName, hbaseContext, splitSize);
 
     // Scan over all positions
     List<String> allPositions = scan(tableName, hbaseContext, true, TestGVCF::process).collect();
@@ -109,7 +110,8 @@ public class TestGVCF implements Serializable {
   }
 
   public void put(JavaRDD<VariantLite> rdd, TableName tableName, JavaHBaseContext
-      hbaseContext) {
+      hbaseContext, int splitSize) {
+    // TODO: how to break variants into two that span the split boundary?
     // TODO: can we use bulkLoad for efficiency (need to port interface to Java)
     hbaseContext.bulkPut(rdd, tableName, (Function<VariantLite, Put>) v -> {
       Put put = new Put(Bytes.toBytes(v.getStart()));
