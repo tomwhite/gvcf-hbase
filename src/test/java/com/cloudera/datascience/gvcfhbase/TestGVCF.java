@@ -150,33 +150,55 @@ public class TestGVCF implements Serializable {
       List<Put> puts = null;
       int start = v.getStart();
       int end = v.getEnd();
-      int startSplit = (start - 1) / splitSize; // start and end are 1-based like VCF
-      int endSplit = (end - 1) / splitSize;
-      if (startSplit == endSplit) {
-        puts = ImmutableList.of(encodePut(start, end, v.getGenotype()));
+      int startSplitIndex = (start - 1) / splitSize; // start and end are 1-based like VCF
+      int endSplitIndex = (end - 1) / splitSize;
+      if (startSplitIndex == endSplitIndex) {
+        puts = ImmutableList.of(encodeVariant(v));
       } else {
-        int midStart = (startSplit + 1) * splitSize + 1;
+        int midStart = (startSplitIndex + 1) * splitSize + 1;
         int midEnd = midStart - 1;
-        puts = ImmutableList.of(encodePut(start, midEnd, v.getGenotype()),
-            encodePut(midStart, end, v.getGenotype()));
+        VariantLite v1 = new VariantLite(start, end, start, midEnd, v.getGenotype());
+        VariantLite v2 = new VariantLite(start, end, midStart, end, v.getGenotype());
+        puts = ImmutableList.of(encodeVariant(v1), encodeVariant(v2));
       }
       return puts;
     });
   }
 
-  private Put encodePut(int start, int end, GenotypeLite genotype) {
-    Put put = new Put(Bytes.toBytes(start));
+  private Put encodeVariant(VariantLite variant) {
     // note that we only store one genotype here as we expect to load single sample
     // gvcf files
+    GenotypeLite genotype = variant.getGenotype();
+    int start = variant.getStart();
+    int end = variant.getEnd();
+    int logicalStart = variant.getLogicalStart();
+    int logicalEnd = variant.getLogicalEnd();
+    Put put = new Put(Bytes.toBytes(logicalStart));
     byte[] qualifier = Bytes.toBytes(genotype.getSampleIndex());
-    String val = end + "," + genotype.getValue(); // poor encoding!
+    String val = logicalEnd + "," + start + "," + end + "," + genotype.getValue();// poor encoding!
     byte[] value = Bytes.toBytes(val);
     put.addColumn(SAMPLE_COLUMN_FAMILY, qualifier, value);
-    System.out.println("put: " + genotype.getSampleIndex() + ":" + start + "(" + end +
+    System.out.println("put: " + genotype.getSampleIndex() + ":" + logicalStart + "(" +
+        logicalEnd +
         ") "
         + genotype
         .getValue());
     return put;
+  }
+
+  private VariantLite decodeVariant(int logicalStart, Cell cell) {
+    int sampleIndex = Bytes.toInt(cell.getQualifierArray(),
+        cell.getQualifierOffset(), cell.getQualifierLength());
+    String val = Bytes.toString(cell.getValueArray(), cell.getValueOffset(),
+        cell.getValueLength());
+    String[] splits = val.split(",");
+    int logicalEnd = Integer.parseInt(splits[0]);
+    int start = Integer.parseInt(splits[1]);
+    int end = Integer.parseInt(splits[2]);
+    GenotypeLite genotype = new GenotypeLite(sampleIndex, splits[3]);
+    return new VariantLite(start, end, logicalStart, logicalEnd, genotype); // TODO: do
+    // we need to
+    // store logical start and end so that processing can ignore entry if needed?
   }
 
   public <T> JavaRDD<T> scan(TableName tableName, JavaHBaseContext
@@ -199,34 +221,26 @@ public class TestGVCF implements Serializable {
               System.out.println("tw: row key: " + Bytes.toInt(result.getRow()));
               variantsBySampleIndex = Arrays.asList(new VariantLite[numSamples]);
             }
-            int start = Bytes.toInt(result.getRow());
+            int logicalStart = Bytes.toInt(result.getRow());
             boolean isVariantPos = false;
             for (Cell cell : result.listCells()) {
-              int sampleIndex = Bytes.toInt(cell.getQualifierArray(),
-                  cell.getQualifierOffset(), cell.getQualifierLength());
-              String val = Bytes.toString(cell.getValueArray(), cell.getValueOffset(),
-                  cell.getValueLength());
-              String[] splits = val.split(",");
-              int end = Integer.parseInt(splits[0]);
-              GenotypeLite genotype = new GenotypeLite(sampleIndex, splits[1]);
-              VariantLite variant = new VariantLite(start, end, genotype);
-              variantsBySampleIndex.set(sampleIndex, variant);
+              VariantLite variant = decodeVariant(logicalStart, cell);
+              variantsBySampleIndex.set(variant.getGenotype().getSampleIndex(), variant);
               if (!variant.getGenotype().getValue().equals("N/A")) {
                 isVariantPos = true;
               }
             }
-            int nextEnd = Integer.MAX_VALUE; // how many positions we can iterate over
-            // before the next row
+            int nextLogicalEnd = Integer.MAX_VALUE; // how many positions we can iterate over before the next row
             for (VariantLite variant : variantsBySampleIndex) {
-              nextEnd = Math.min(variant.getEnd(), nextEnd);
+              nextLogicalEnd = Math.min(variant.getLogicalEnd(), nextLogicalEnd);
             }
 
             if (allPositions) {
-              for (int pos = start; pos <= nextEnd; pos++) {
+              for (int pos = logicalStart; pos <= nextLogicalEnd; pos++) {
                 output.add(f.call(pos, variantsBySampleIndex));
               }
             } else if (isVariantPos) {
-              output.add(f.call(start, variantsBySampleIndex));
+              output.add(f.call(logicalStart, variantsBySampleIndex));
             }
           }
           return output;
