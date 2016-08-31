@@ -74,8 +74,8 @@ public class TestGVCF implements Serializable {
 
     ImmutableList<VariantLite> gvcf2 = ImmutableList.of(
         new VariantLite(1, 3, new GenotypeLite(1, "0|1")),
-        new VariantLite(4, 6, new GenotypeLite(1, "N/A")),
-        new VariantLite(7, 8, new GenotypeLite(1, "0|0")));
+        new VariantLite(4, 6, new GenotypeLite(1, "0|0")),
+        new VariantLite(7, 8, new GenotypeLite(1, "N/A")));
 
     JavaRDD<VariantLite> rdd1 = jsc.parallelize(gvcf1);
     JavaRDD<VariantLite> rdd2 = jsc.parallelize(gvcf2);
@@ -95,11 +95,11 @@ public class TestGVCF implements Serializable {
         "1,0|0(end=1),0|1(end=3)",
         "2,N/A(end=7),0|1(end=3)",
         "3,N/A(end=7),0|1(end=3)",
-        "4,N/A(end=7),N/A(end=6)",
-        "5,N/A(end=7),N/A(end=6)",
-        "6,N/A(end=7),N/A(end=6)",
-        "7,N/A(end=7),0|0(end=8)",
-        "8,1|1(end=8),0|0(end=8)");
+        "4,N/A(end=7),0|0(end=6)",
+        "5,N/A(end=7),0|0(end=6)",
+        "6,N/A(end=7),0|0(end=6)",
+        "7,N/A(end=7),N/A(end=8)",
+        "8,1|1(end=8),N/A(end=8)");
     assertEquals(expectedAllPositions, allPositions);
 
 //    // Scan over variants only
@@ -107,8 +107,8 @@ public class TestGVCF implements Serializable {
 //    //allVariants.forEach(System.out::println);
 //    List<String> expectedAllVariants = ImmutableList.of(
 //        "1,0|0(end=1),0|1(end=3)",
-//        "7,N/A(end=7),0|0(end=8)",
-//        "8,1|1(end=8),0|0(end=8)");
+//        "4,N/A(end=7),0|0(end=6)",
+//        "8,1|1(end=8),N/A(end=8)");
 //    assertEquals(expectedAllVariants, allVariants);
 
     testUtil.deleteTable(tableName);
