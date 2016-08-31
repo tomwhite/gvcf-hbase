@@ -205,8 +205,9 @@ public class TestGVCF implements Serializable {
           while (rows.hasNext()) {
             Tuple2<ImmutableBytesWritable, Result> row = rows.next();
             Result result = row._2();
-            if (numSamples == -1) { // determine number of samples from first row,
-              // since they all have an entry there TODO: use column family metadata here
+            // determine number of samples from first row in split,
+            // since they all have an entry there
+            if (numSamples == -1) {
               numSamples = result.listCells().size();
               variantsBySampleIndex = Arrays.asList(new VariantLite[numSamples]);
             }
