@@ -155,6 +155,7 @@ public class TestGVCF implements Serializable {
       if (startSplitIndex == endSplitIndex) {
         puts = ImmutableList.of(encodeVariant(v));
       } else {
+        // break into two logical variants
         int midStart = (startSplitIndex + 1) * splitSize + 1;
         int midEnd = midStart - 1;
         VariantLite v1 = new VariantLite(start, end, start, midEnd, v.getGenotype());
@@ -196,9 +197,7 @@ public class TestGVCF implements Serializable {
     int start = Integer.parseInt(splits[1]);
     int end = Integer.parseInt(splits[2]);
     GenotypeLite genotype = new GenotypeLite(sampleIndex, splits[3]);
-    return new VariantLite(start, end, logicalStart, logicalEnd, genotype); // TODO: do
-    // we need to
-    // store logical start and end so that processing can ignore entry if needed?
+    return new VariantLite(start, end, logicalStart, logicalEnd, genotype);
   }
 
   public <T> JavaRDD<T> scan(TableName tableName, JavaHBaseContext
