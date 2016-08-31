@@ -51,14 +51,12 @@ public class TestGVCF implements Serializable {
 
   @Test
   public void test() throws Exception {
+    int splitSize = 4;
+
     TableName tableName = TableName.valueOf("gvcf");
     byte[][] columnFamilies = new byte[][] { SAMPLE_COLUMN_FAMILY };
-    byte[][] splitKeys = new byte[][] { Bytes.toBytes(5) };
+    byte[][] splitKeys = new byte[][] { Bytes.toBytes(splitSize + 1) };
     HTable table = testUtil.createTable(tableName, columnFamilies, splitKeys);
-
-    for (TableName n : testUtil.getHBaseAdmin().listTableNames()) {
-      System.out.println("tw: " + n.getNameAsString());
-    }
 
     // create an RDD
     SparkConf sparkConf = new SparkConf()
@@ -84,7 +82,6 @@ public class TestGVCF implements Serializable {
 
     Configuration conf = testUtil.getConfiguration();
     JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, conf);
-    int splitSize = 4;
     put(rdd1, tableName, hbaseContext, splitSize);
     put(rdd2, tableName, hbaseContext, splitSize);
 
@@ -102,14 +99,14 @@ public class TestGVCF implements Serializable {
         "8,1|1(end=8),N/A(end=8)");
     assertEquals(expectedAllPositions, allPositions);
 
-//    // Scan over variants only
-//    List<String> allVariants = scan(tableName, hbaseContext, false, TestGVCF::process).collect();
-//    //allVariants.forEach(System.out::println);
-//    List<String> expectedAllVariants = ImmutableList.of(
-//        "1,0|0(end=1),0|1(end=3)",
-//        "4,N/A(end=7),0|0(end=6)",
-//        "8,1|1(end=8),N/A(end=8)");
-//    assertEquals(expectedAllVariants, allVariants);
+    // Scan over variants only
+    List<String> allVariants = scan(tableName, hbaseContext, false, TestGVCF::process).collect();
+    //allVariants.forEach(System.out::println);
+    List<String> expectedAllVariants = ImmutableList.of(
+        "1,0|0(end=1),0|1(end=3)",
+        "4,N/A(end=7),0|0(end=6)",
+        "8,1|1(end=8),N/A(end=8)");
+    assertEquals(expectedAllVariants, allVariants);
 
     testUtil.deleteTable(tableName);
   }
@@ -179,11 +176,6 @@ public class TestGVCF implements Serializable {
     String val = logicalEnd + "," + start + "," + end + "," + genotype.getValue();// poor encoding!
     byte[] value = Bytes.toBytes(val);
     put.addColumn(SAMPLE_COLUMN_FAMILY, qualifier, value);
-    System.out.println("put: " + genotype.getSampleIndex() + ":" + logicalStart + "(" +
-        logicalEnd +
-        ") "
-        + genotype
-        .getValue());
     return put;
   }
 
@@ -216,8 +208,6 @@ public class TestGVCF implements Serializable {
             if (numSamples == -1) { // determine number of samples from first row,
               // since they all have an entry there TODO: use column family metadata here
               numSamples = result.listCells().size();
-              System.out.println("tw: num samples : " + numSamples);
-              System.out.println("tw: row key: " + Bytes.toInt(result.getRow()));
               variantsBySampleIndex = Arrays.asList(new VariantLite[numSamples]);
             }
             int logicalStart = Bytes.toInt(result.getRow());
@@ -225,7 +215,8 @@ public class TestGVCF implements Serializable {
             for (Cell cell : result.listCells()) {
               VariantLite variant = decodeVariant(logicalStart, cell);
               variantsBySampleIndex.set(variant.getGenotype().getSampleIndex(), variant);
-              if (!variant.getGenotype().getValue().equals("N/A")) {
+              if (!variant.getGenotype().getValue().equals("N/A") &&
+                  variant.getLogicalStart() == variant.getStart()) {
                 isVariantPos = true;
               }
             }
