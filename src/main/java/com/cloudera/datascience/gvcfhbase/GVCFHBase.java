@@ -26,6 +26,9 @@ public class GVCFHBase {
 
   public static final byte[] SAMPLE_COLUMN_FAMILY = Bytes.toBytes("s");
 
+  private static HBaseVariantEncoder<VariantLite> variantEncoder =
+      new HBaseVariantLiteEncoder();
+
   public static void put(JavaRDD<VariantLite> rdd, TableName tableName, JavaHBaseContext
       hbaseContext, int splitSize) {
     // TODO: can we use bulkLoad for efficiency (need to port interface to Java)
@@ -74,8 +77,7 @@ public class GVCFHBase {
             for (Cell cell : result.listCells()) {
               VariantLite variant = decodeVariant(logicalStart, cell);
               variantsBySampleIndex.set(variant.getGenotype().getSampleIndex(), variant);
-              if (!variant.getGenotype().getValue().equals("N/A") &&
-                  variant.getLogicalStart() == variant.getStart()) {
+              if (isRefPosition(logicalStart, variant)) {
                 isVariantPos = true;
               }
             }
@@ -127,33 +129,17 @@ public class GVCFHBase {
         });
   }
 
+  // TODO: move following into an interface
+
   private static Put encodeVariant(VariantLite variant) {
-    // note that we only store one genotype here as we expect to load single sample
-    // gvcf files
-    GenotypeLite genotype = variant.getGenotype();
-    int start = variant.getStart();
-    int end = variant.getEnd();
-    int logicalStart = variant.getLogicalStart();
-    int logicalEnd = variant.getLogicalEnd();
-    Put put = new Put(Bytes.toBytes(logicalStart));
-    byte[] qualifier = Bytes.toBytes(genotype.getSampleIndex());
-    // TODO: improve encoding
-    String val = logicalEnd + "," + start + "," + end + "," + genotype.getValue();
-    byte[] value = Bytes.toBytes(val);
-    put.addColumn(SAMPLE_COLUMN_FAMILY, qualifier, value);
-    return put;
+    return variantEncoder.encodeVariant(variant);
   }
 
   private static VariantLite decodeVariant(int logicalStart, Cell cell) {
-    int sampleIndex = Bytes.toInt(cell.getQualifierArray(),
-        cell.getQualifierOffset(), cell.getQualifierLength());
-    String val = Bytes.toString(cell.getValueArray(), cell.getValueOffset(),
-        cell.getValueLength());
-    String[] splits = val.split(",");
-    int logicalEnd = Integer.parseInt(splits[0]);
-    int start = Integer.parseInt(splits[1]);
-    int end = Integer.parseInt(splits[2]);
-    GenotypeLite genotype = new GenotypeLite(sampleIndex, splits[3]);
-    return new VariantLite(start, end, logicalStart, logicalEnd, genotype);
+    return variantEncoder.decodeVariant(logicalStart, cell);
+  }
+
+  private static boolean isRefPosition(int logicalStart, VariantLite variant) {
+    return variantEncoder.isRefPosition(logicalStart, variant);
   }
 }
