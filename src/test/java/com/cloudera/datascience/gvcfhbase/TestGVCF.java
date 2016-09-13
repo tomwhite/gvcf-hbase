@@ -33,9 +33,9 @@ public class TestGVCF implements Serializable {
     testUtil.shutdownMiniCluster();
   }
 
-  private static String process(int pos, Iterable<VariantLite> variants) {
+  private static String process(RowKey rowKey, Iterable<VariantLite> variants) {
     StringBuilder sb = new StringBuilder();
-    sb.append(pos).append(",");
+    sb.append(rowKey.contig).append(":").append(rowKey.pos).append(",");
     for (VariantLite variant : variants) {
       GenotypeLite genotype = variant.getGenotype();
       sb.append(genotype.getValue());
@@ -66,14 +66,14 @@ public class TestGVCF implements Serializable {
         new HBaseVariantLiteEncoder();
 
     ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
-        new VariantLite(1, 1, new GenotypeLite(0, "0|0")),
-        new VariantLite(2, 7, new GenotypeLite(0, "N/A")),
-        new VariantLite(8, 8, new GenotypeLite(0, "1|1")));
+        new VariantLite("20", 1, 1, new GenotypeLite(0, "0|0")),
+        new VariantLite("20", 2, 7, new GenotypeLite(0, "N/A")),
+        new VariantLite("20", 8, 8, new GenotypeLite(0, "1|1")));
 
     ImmutableList<VariantLite> gvcf2 = ImmutableList.of(
-        new VariantLite(1, 3, new GenotypeLite(1, "0|1")),
-        new VariantLite(4, 6, new GenotypeLite(1, "0|0")),
-        new VariantLite(7, 8, new GenotypeLite(1, "N/A")));
+        new VariantLite("20", 1, 3, new GenotypeLite(1, "0|1")),
+        new VariantLite("20", 4, 6, new GenotypeLite(1, "0|0")),
+        new VariantLite("20", 7, 8, new GenotypeLite(1, "N/A")));
 
     JavaRDD<VariantLite> rdd1 = jsc.parallelize(gvcf1);
     JavaRDD<VariantLite> rdd2 = jsc.parallelize(gvcf2);
@@ -91,14 +91,14 @@ public class TestGVCF implements Serializable {
         .collect();
     //allPositions.forEach(System.out::println);
     List<String> expectedAllPositions = ImmutableList.of(
-        "1,0|0(end=1),0|1(end=3)",
-        "2,N/A(end=7),0|1(end=3)",
-        "3,N/A(end=7),0|1(end=3)",
-        "4,N/A(end=7),0|0(end=6)",
-        "5,N/A(end=7),0|0(end=6)",
-        "6,N/A(end=7),0|0(end=6)",
-        "7,N/A(end=7),N/A(end=8)",
-        "8,1|1(end=8),N/A(end=8)");
+        "20:1,0|0(end=1),0|1(end=3)",
+        "20:2,N/A(end=7),0|1(end=3)",
+        "20:3,N/A(end=7),0|1(end=3)",
+        "20:4,N/A(end=7),0|0(end=6)",
+        "20:5,N/A(end=7),0|0(end=6)",
+        "20:6,N/A(end=7),0|0(end=6)",
+        "20:7,N/A(end=7),N/A(end=8)",
+        "20:8,1|1(end=8),N/A(end=8)");
     assertEquals(expectedAllPositions, allPositions);
 
     // Scan over variants only
@@ -107,9 +107,9 @@ public class TestGVCF implements Serializable {
         .collect();
     //allVariants.forEach(System.out::println);
     List<String> expectedAllVariants = ImmutableList.of(
-        "1,0|0(end=1),0|1(end=3)",
-        "4,N/A(end=7),0|0(end=6)",
-        "8,1|1(end=8),N/A(end=8)");
+        "20:1,0|0(end=1),0|1(end=3)",
+        "20:4,N/A(end=7),0|0(end=6)",
+        "20:8,1|1(end=8),N/A(end=8)");
     assertEquals(expectedAllVariants, allVariants);
 
     testUtil.deleteTable(tableName);

@@ -5,7 +5,8 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.util.Bytes;
 
-public class HBaseVariantLiteEncoder implements HBaseVariantEncoder<VariantLite>, Serializable {
+public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
+    implements Serializable {
   @Override
   public Put encodeVariant(VariantLite variant) {
     // note that we only store one genotype here as we expect to load single sample
@@ -15,7 +16,8 @@ public class HBaseVariantLiteEncoder implements HBaseVariantEncoder<VariantLite>
     int end = variant.getEnd();
     int logicalStart = variant.getLogicalStart();
     int logicalEnd = variant.getLogicalEnd();
-    Put put = new Put(Bytes.toBytes(logicalStart));
+    byte[] rowKey = toRowKeyBytes(variant.getContig(), logicalStart);
+    Put put = new Put(rowKey);
     byte[] qualifier = Bytes.toBytes(genotype.getSampleIndex());
     String val = logicalEnd + "," + start + "," + end + "," + genotype.getValue();
     byte[] value = Bytes.toBytes(val);
@@ -24,7 +26,7 @@ public class HBaseVariantLiteEncoder implements HBaseVariantEncoder<VariantLite>
   }
 
   @Override
-  public VariantLite decodeVariant(int logicalStart, Cell cell) {
+  public VariantLite decodeVariant(RowKey rowKey, Cell cell) {
     int sampleIndex = Bytes.toInt(cell.getQualifierArray(),
         cell.getQualifierOffset(), cell.getQualifierLength());
     String val = Bytes.toString(cell.getValueArray(), cell.getValueOffset(),
@@ -34,7 +36,8 @@ public class HBaseVariantLiteEncoder implements HBaseVariantEncoder<VariantLite>
     int start = Integer.parseInt(splits[1]);
     int end = Integer.parseInt(splits[2]);
     GenotypeLite genotype = new GenotypeLite(sampleIndex, splits[3]);
-    return new VariantLite(start, end, logicalStart, logicalEnd, genotype);
+    return new VariantLite(rowKey.contig, start, end, rowKey.pos, logicalEnd,
+        genotype);
   }
 
   @Override
@@ -65,11 +68,12 @@ public class HBaseVariantLiteEncoder implements HBaseVariantEncoder<VariantLite>
 
   @Override
   public VariantLite[] split(VariantLite variant, int midStart, int midEnd) {
+    String contig = variant.getContig();
     int start = variant.getStart();
     int end = variant.getEnd();
     return new VariantLite[] {
-        new VariantLite(start, end, start, midEnd, variant.getGenotype()),
-        new VariantLite(start, end, midStart, end, variant.getGenotype())
+        new VariantLite(contig, start, end, start, midEnd, variant.getGenotype()),
+        new VariantLite(contig, start, end, midStart, end, variant.getGenotype())
     };
   }
 }

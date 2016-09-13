@@ -6,27 +6,34 @@ import java.io.Serializable;
 import java.util.List;
 
 public class VariantLite implements Serializable {
+  private String contig;
   private int start;
   private int end;
   private int logicalStart;
   private int logicalEnd;
   private List<GenotypeLite> genotypes;
 
-  public VariantLite(int start, int end, GenotypeLite genotype) {
-    this(start, end, start, end, ImmutableList.of(genotype));
+  public VariantLite(String contig,int start, int end, GenotypeLite genotype) {
+    this(contig, start, end, start, end, ImmutableList.of(genotype));
   }
 
-  public VariantLite(int start, int end, int logicalStart, int logicalEnd, GenotypeLite genotype) {
-    this(start, end, logicalStart, logicalEnd, ImmutableList.of(genotype));
+  public VariantLite(String contig, int start, int end, int logicalStart, int
+      logicalEnd, GenotypeLite genotype) {
+    this(contig, start, end, logicalStart, logicalEnd, ImmutableList.of(genotype));
   }
 
-  private VariantLite(int start, int end, int logicalStart, int logicalEnd,
+  private VariantLite(String contig, int start, int end, int logicalStart, int logicalEnd,
       List<GenotypeLite> genotypes) {
+    this.contig = contig;
     this.start = start;
     this.end = end;
     this.logicalStart = logicalStart;
     this.logicalEnd = logicalEnd;
     this.genotypes = genotypes;
+  }
+
+  public String getContig() {
+    return contig;
   }
 
   public int getStart() {
@@ -64,13 +71,15 @@ public class VariantLite implements Serializable {
     if (end != that.end) return false;
     if (logicalStart != that.logicalStart) return false;
     if (logicalEnd != that.logicalEnd) return false;
+    if (contig != null ? !contig.equals(that.contig) : that.contig != null) return false;
     return genotypes != null ? genotypes.equals(that.genotypes) : that.genotypes == null;
 
   }
 
   @Override
   public int hashCode() {
-    int result = start;
+    int result = contig != null ? contig.hashCode() : 0;
+    result = 31 * result + start;
     result = 31 * result + end;
     result = 31 * result + logicalStart;
     result = 31 * result + logicalEnd;
@@ -81,9 +90,10 @@ public class VariantLite implements Serializable {
   @Override
   public String toString() {
     return "VariantLite{" +
-        "start=" + start +
+        "contig='" + contig + '\'' +
+        ", start=" + start +
         ", end=" + end +
-        ", logicalStart=" + logicalStart +
+        ", pos=" + logicalStart +
         ", logicalEnd=" + logicalEnd +
         ", genotypes=" + genotypes +
         '}';

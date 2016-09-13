@@ -1,20 +1,38 @@
 package com.cloudera.datascience.gvcfhbase;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.util.Bytes;
 
 /**
  * An interface for encapsulating the way that a variant object (of type <code>V</code>)
  * is converted to and from the HBase bytes representation.
  * @param <V>
  */
-public interface HBaseVariantEncoder<V> {
-  Put encodeVariant(V variant);
-  V decodeVariant(int logicalStart, Cell cell);
-  boolean isRefPosition(int logicalStart, V variant);
-  int getSampleIndex(V variant);
-  int getStart(V variant);
-  int getEnd(V variant);
-  int getLogicalEnd(V variant);
-  V[] split(V v, int midStart, int midEnd);
+public abstract class HBaseVariantEncoder<V> {
+  public abstract Put encodeVariant(V variant);
+  public abstract V decodeVariant(RowKey rowKey, Cell cell);
+  public abstract boolean isRefPosition(int logicalStart, V variant);
+  public abstract int getSampleIndex(V variant);
+  public abstract int getStart(V variant);
+  public abstract int getEnd(V variant);
+  public abstract int getLogicalEnd(V variant);
+  public abstract V[] split(V v, int midStart, int midEnd);
+
+  private static final int CONTIG_LENGTH = 2;
+
+  public byte[] toRowKeyBytes(String contig, int logicalStart) {
+    byte[] row = new byte[CONTIG_LENGTH + Bytes.SIZEOF_INT];
+    Bytes.putBytes(row, 0, Bytes.toBytes(StringUtils.leftPad(contig, 2)), 0, CONTIG_LENGTH);
+    Bytes.putInt(row, CONTIG_LENGTH, logicalStart);
+    return row;
+  }
+
+  public RowKey fromRowKeyBytes(byte[] row) {
+    return new RowKey(
+        Bytes.toString(row, 0, CONTIG_LENGTH).trim(),
+        Bytes.toInt(row, CONTIG_LENGTH)
+    );
+  }
 }
