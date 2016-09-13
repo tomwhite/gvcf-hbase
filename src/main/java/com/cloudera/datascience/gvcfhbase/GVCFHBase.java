@@ -70,12 +70,11 @@ public class GVCFHBase {
               variantsBySampleIndex = Arrays.asList((V[]) new Object[numSamples]);
             }
             RowKey rowKey = variantEncoder.fromRowKeyBytes(result.getRow());
-            int logicalStart = rowKey.pos;
             boolean isVariantPos = false;
             for (Cell cell : result.listCells()) {
               V variant = variantEncoder.decodeVariant(rowKey, cell);
               variantsBySampleIndex.set(variantEncoder.getSampleIndex(variant), variant);
-              if (variantEncoder.isRefPosition(logicalStart, variant)) {
+              if (variantEncoder.isRefPosition(rowKey, variant)) {
                 isVariantPos = true;
               }
             }
@@ -86,8 +85,7 @@ public class GVCFHBase {
             }
 
             if (allPositions) {
-              for (int pos = logicalStart; pos <= nextLogicalEnd; pos++) {
-                rowKey.pos = pos;
+              for (; rowKey.pos <= nextLogicalEnd; rowKey.pos++) {
                 output.add(f.call(rowKey, variantsBySampleIndex));
               }
             } else if (isVariantPos) {

@@ -41,9 +41,9 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
   }
 
   @Override
-  public boolean isRefPosition(int logicalStart, VariantLite variant) {
+  public boolean isRefPosition(RowKey rowKey, VariantLite variant) {
     return !variant.getGenotype().getValue().equals("N/A") &&
-        logicalStart == variant.getStart();
+        rowKey.pos == variant.getStart();
   }
 
   @Override

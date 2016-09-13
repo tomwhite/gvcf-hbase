@@ -13,7 +13,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 public abstract class HBaseVariantEncoder<V> {
   public abstract Put encodeVariant(V variant);
   public abstract V decodeVariant(RowKey rowKey, Cell cell);
-  public abstract boolean isRefPosition(int logicalStart, V variant);
+  public abstract boolean isRefPosition(RowKey rowKey, V variant);
   public abstract int getSampleIndex(V variant);
   public abstract int getStart(V variant);
   public abstract int getEnd(V variant);
