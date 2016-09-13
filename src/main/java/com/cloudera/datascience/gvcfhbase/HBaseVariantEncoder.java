@@ -12,4 +12,9 @@ public interface HBaseVariantEncoder<V> {
   Put encodeVariant(V variant);
   V decodeVariant(int logicalStart, Cell cell);
   boolean isRefPosition(int logicalStart, V variant);
+  int getSampleIndex(V variant);
+  int getStart(V variant);
+  int getEnd(V variant);
+  int getLogicalEnd(V variant);
+  V[] split(V v, int midStart, int midEnd);
 }

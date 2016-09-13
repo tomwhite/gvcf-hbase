@@ -62,6 +62,9 @@ public class TestGVCF implements Serializable {
         .set("spark.io.compression.codec", "lzf");
     JavaSparkContext jsc = new JavaSparkContext(sparkConf);
 
+    HBaseVariantEncoder<VariantLite> variantEncoder =
+        new HBaseVariantLiteEncoder();
+
     ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
         new VariantLite(1, 1, new GenotypeLite(0, "0|0")),
         new VariantLite(2, 7, new GenotypeLite(0, "N/A")),
@@ -79,12 +82,12 @@ public class TestGVCF implements Serializable {
 
     Configuration conf = testUtil.getConfiguration();
     JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, conf);
-    GVCFHBase.put(rdd1, tableName, hbaseContext, splitSize);
-    GVCFHBase.put(rdd2, tableName, hbaseContext, splitSize);
+    GVCFHBase.put(rdd1, variantEncoder, tableName, hbaseContext, splitSize);
+    GVCFHBase.put(rdd2, variantEncoder, tableName, hbaseContext, splitSize);
 
     // Scan over all positions
-    List<String> allPositions = GVCFHBase.scan(tableName, hbaseContext, true,
-        TestGVCF::process)
+    List<String> allPositions = GVCFHBase.scan(variantEncoder, tableName, hbaseContext,
+        true, TestGVCF::process)
         .collect();
     //allPositions.forEach(System.out::println);
     List<String> expectedAllPositions = ImmutableList.of(
@@ -99,8 +102,8 @@ public class TestGVCF implements Serializable {
     assertEquals(expectedAllPositions, allPositions);
 
     // Scan over variants only
-    List<String> allVariants = GVCFHBase.scan(tableName, hbaseContext, false,
-        TestGVCF::process)
+    List<String> allVariants = GVCFHBase.scan(variantEncoder, tableName, hbaseContext,
+        false, TestGVCF::process)
         .collect();
     //allVariants.forEach(System.out::println);
     List<String> expectedAllVariants = ImmutableList.of(

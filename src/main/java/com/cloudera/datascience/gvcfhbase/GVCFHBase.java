@@ -26,42 +26,39 @@ public class GVCFHBase {
 
   public static final byte[] SAMPLE_COLUMN_FAMILY = Bytes.toBytes("s");
 
-  private static HBaseVariantEncoder<VariantLite> variantEncoder =
-      new HBaseVariantLiteEncoder();
-
-  public static void put(JavaRDD<VariantLite> rdd, TableName tableName, JavaHBaseContext
-      hbaseContext, int splitSize) {
-    // TODO: can we use bulkLoad for efficiency (need to port interface to Java)
-    bulkPut(hbaseContext, rdd, tableName, (FlatMapFunction<VariantLite, Put>) v -> {
+  public static <V> void put(JavaRDD<V> rdd, HBaseVariantEncoder<V> variantEncoder,
+      TableName tableName, JavaHBaseContext hbaseContext, int splitSize) {
+    bulkPut(hbaseContext, rdd, tableName, (FlatMapFunction<V, Put>) v -> {
       List<Put> puts = null;
-      int start = v.getStart();
-      int end = v.getEnd();
+      int start = variantEncoder.getStart(v);
+      int end = variantEncoder.getEnd(v);
       int startSplitIndex = (start - 1) / splitSize; // start and end are 1-based like VCF
       int endSplitIndex = (end - 1) / splitSize;
       if (startSplitIndex == endSplitIndex) {
-        puts = ImmutableList.of(encodeVariant(v));
+        puts = ImmutableList.of(variantEncoder.encodeVariant(v));
       } else {
         // break into two logical variants
         int midStart = (startSplitIndex + 1) * splitSize + 1;
         int midEnd = midStart - 1;
-        VariantLite v1 = new VariantLite(start, end, start, midEnd, v.getGenotype());
-        VariantLite v2 = new VariantLite(start, end, midStart, end, v.getGenotype());
-        puts = ImmutableList.of(encodeVariant(v1), encodeVariant(v2));
+        V[] vs = variantEncoder.split(v, midStart, midEnd);
+        puts = ImmutableList.of(variantEncoder.encodeVariant(vs[0]),
+            variantEncoder.encodeVariant(vs[1]));
       }
       return puts;
     });
   }
 
-  public static <T> JavaRDD<T> scan(TableName tableName, JavaHBaseContext
-      hbaseContext, boolean allPositions, Function2<Integer, Iterable<VariantLite>, T>
-      f) {
+  @SuppressWarnings("unchecked")
+  public static <T, V> JavaRDD<T> scan(HBaseVariantEncoder<V> variantEncoder,
+      TableName tableName, JavaHBaseContext
+      hbaseContext, boolean allPositions, Function2<Integer, Iterable<V>, T> f) {
     Scan scan = new Scan();
     scan.setCaching(100);
     return hbaseContext.hbaseRDD(tableName, scan)
         .mapPartitions((FlatMapFunction<Iterator<Tuple2<ImmutableBytesWritable,
             Result>>, T>) rows -> {
           List<T> output = new ArrayList<>();
-          List<VariantLite> variantsBySampleIndex = new ArrayList<>();
+          List<V> variantsBySampleIndex = new ArrayList<>();
           int numSamples = -1;
           while (rows.hasNext()) {
             Tuple2<ImmutableBytesWritable, Result> row = rows.next();
@@ -70,21 +67,21 @@ public class GVCFHBase {
             // since they all have an entry there
             if (numSamples == -1) {
               numSamples = result.listCells().size();
-              variantsBySampleIndex = Arrays.asList(new VariantLite[numSamples]);
+              variantsBySampleIndex = Arrays.asList((V[]) new Object[numSamples]);
             }
             int logicalStart = Bytes.toInt(result.getRow());
             boolean isVariantPos = false;
             for (Cell cell : result.listCells()) {
-              VariantLite variant = decodeVariant(logicalStart, cell);
-              variantsBySampleIndex.set(variant.getGenotype().getSampleIndex(), variant);
-              if (isRefPosition(logicalStart, variant)) {
+              V variant = variantEncoder.decodeVariant(logicalStart, cell);
+              variantsBySampleIndex.set(variantEncoder.getSampleIndex(variant), variant);
+              if (variantEncoder.isRefPosition(logicalStart, variant)) {
                 isVariantPos = true;
               }
             }
             int nextLogicalEnd = Integer.MAX_VALUE; // how many positions we can
             // iterate over before the next row
-            for (VariantLite variant : variantsBySampleIndex) {
-              nextLogicalEnd = Math.min(variant.getLogicalEnd(), nextLogicalEnd);
+            for (V variant : variantsBySampleIndex) {
+              nextLogicalEnd = Math.min(variantEncoder.getLogicalEnd(variant), nextLogicalEnd);
             }
 
             if (allPositions) {
@@ -127,19 +124,5 @@ public class GVCFHBase {
             m.close();
           }
         });
-  }
-
-  // TODO: move following into an interface
-
-  private static Put encodeVariant(VariantLite variant) {
-    return variantEncoder.encodeVariant(variant);
-  }
-
-  private static VariantLite decodeVariant(int logicalStart, Cell cell) {
-    return variantEncoder.decodeVariant(logicalStart, cell);
-  }
-
-  private static boolean isRefPosition(int logicalStart, VariantLite variant) {
-    return variantEncoder.isRefPosition(logicalStart, variant);
   }
 }
