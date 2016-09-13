@@ -14,12 +14,12 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
     GenotypeLite genotype = variant.getGenotype();
     int start = variant.getStart();
     int end = variant.getEnd();
-    int logicalStart = variant.getLogicalStart();
-    int logicalEnd = variant.getLogicalEnd();
-    byte[] rowKey = toRowKeyBytes(variant.getContig(), logicalStart);
+    int keyStart = variant.getKeyStart();
+    int keyEnd = variant.getKeyEnd();
+    byte[] rowKey = toRowKeyBytes(variant.getContig(), keyStart);
     Put put = new Put(rowKey);
     byte[] qualifier = Bytes.toBytes(genotype.getSampleIndex());
-    String val = logicalEnd + "," + start + "," + end + "," + genotype.getValue();
+    String val = keyEnd + "," + start + "," + end + "," + genotype.getValue();
     byte[] value = Bytes.toBytes(val);
     put.addColumn(GVCFHBase.SAMPLE_COLUMN_FAMILY, qualifier, value);
     return put;
@@ -32,11 +32,11 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
     String val = Bytes.toString(cell.getValueArray(), cell.getValueOffset(),
         cell.getValueLength());
     String[] splits = val.split(",");
-    int logicalEnd = Integer.parseInt(splits[0]);
+    int keyEnd = Integer.parseInt(splits[0]);
     int start = Integer.parseInt(splits[1]);
     int end = Integer.parseInt(splits[2]);
     GenotypeLite genotype = new GenotypeLite(sampleIndex, splits[3]);
-    return new VariantLite(rowKey.contig, start, end, rowKey.pos, logicalEnd,
+    return new VariantLite(rowKey.contig, start, end, rowKey.pos, keyEnd,
         genotype);
   }
 
@@ -62,18 +62,18 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
   }
 
   @Override
-  public int getLogicalEnd(VariantLite variant) {
-    return variant.getLogicalEnd();
+  public int getKeyEnd(VariantLite variant) {
+    return variant.getKeyEnd();
   }
 
   @Override
-  public VariantLite[] split(VariantLite variant, int midStart, int midEnd) {
+  public VariantLite[] split(VariantLite variant, int key1End, int key2Start) {
     String contig = variant.getContig();
     int start = variant.getStart();
     int end = variant.getEnd();
     return new VariantLite[] {
-        new VariantLite(contig, start, end, start, midEnd, variant.getGenotype()),
-        new VariantLite(contig, start, end, midStart, end, variant.getGenotype())
+        new VariantLite(contig, start, end, start, key1End, variant.getGenotype()),
+        new VariantLite(contig, start, end, key2Start, end, variant.getGenotype())
     };
   }
 }

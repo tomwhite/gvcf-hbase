@@ -37,10 +37,10 @@ public class GVCFHBase {
       if (startSplitIndex == endSplitIndex) {
         puts = ImmutableList.of(variantEncoder.encodeVariant(v));
       } else {
-        // break into two logical variants
-        int midStart = (startSplitIndex + 1) * splitSize + 1;
-        int midEnd = midStart - 1;
-        V[] vs = variantEncoder.split(v, midStart, midEnd);
+        // break into two variants
+        int key2Start = (startSplitIndex + 1) * splitSize + 1;
+        int key1End = key2Start - 1;
+        V[] vs = variantEncoder.split(v, key1End, key2Start);
         puts = ImmutableList.of(variantEncoder.encodeVariant(vs[0]),
             variantEncoder.encodeVariant(vs[1]));
       }
@@ -78,14 +78,14 @@ public class GVCFHBase {
                 isVariantPos = true;
               }
             }
-            int nextLogicalEnd = Integer.MAX_VALUE; // how many positions we can
+            int nextKeyEnd = Integer.MAX_VALUE; // how many positions we can
             // iterate over before the next row
             for (V variant : variantsBySampleIndex) {
-              nextLogicalEnd = Math.min(variantEncoder.getLogicalEnd(variant), nextLogicalEnd);
+              nextKeyEnd = Math.min(variantEncoder.getKeyEnd(variant), nextKeyEnd);
             }
 
             if (allPositions) {
-              for (; rowKey.pos <= nextLogicalEnd; rowKey.pos++) {
+              for (; rowKey.pos <= nextKeyEnd; rowKey.pos++) {
                 output.add(f.call(rowKey, variantsBySampleIndex));
               }
             } else if (isVariantPos) {

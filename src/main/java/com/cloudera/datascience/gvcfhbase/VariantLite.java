@@ -9,26 +9,26 @@ public class VariantLite implements Serializable {
   private String contig;
   private int start;
   private int end;
-  private int logicalStart;
-  private int logicalEnd;
+  private int keyStart;
+  private int keyEnd;
   private List<GenotypeLite> genotypes;
 
   public VariantLite(String contig,int start, int end, GenotypeLite genotype) {
     this(contig, start, end, start, end, ImmutableList.of(genotype));
   }
 
-  public VariantLite(String contig, int start, int end, int logicalStart, int
-      logicalEnd, GenotypeLite genotype) {
-    this(contig, start, end, logicalStart, logicalEnd, ImmutableList.of(genotype));
+  public VariantLite(String contig, int start, int end, int keyStart, int
+      keyEnd, GenotypeLite genotype) {
+    this(contig, start, end, keyStart, keyEnd, ImmutableList.of(genotype));
   }
 
-  private VariantLite(String contig, int start, int end, int logicalStart, int logicalEnd,
+  private VariantLite(String contig, int start, int end, int keyStart, int keyEnd,
       List<GenotypeLite> genotypes) {
     this.contig = contig;
     this.start = start;
     this.end = end;
-    this.logicalStart = logicalStart;
-    this.logicalEnd = logicalEnd;
+    this.keyStart = keyStart;
+    this.keyEnd = keyEnd;
     this.genotypes = genotypes;
   }
 
@@ -44,12 +44,12 @@ public class VariantLite implements Serializable {
     return end;
   }
 
-  public int getLogicalStart() {
-    return logicalStart;
+  public int getKeyStart() {
+    return keyStart;
   }
 
-  public int getLogicalEnd() {
-    return logicalEnd;
+  public int getKeyEnd() {
+    return keyEnd;
   }
 
   public List<GenotypeLite> getGenotypes() {
@@ -69,8 +69,8 @@ public class VariantLite implements Serializable {
 
     if (start != that.start) return false;
     if (end != that.end) return false;
-    if (logicalStart != that.logicalStart) return false;
-    if (logicalEnd != that.logicalEnd) return false;
+    if (keyStart != that.keyStart) return false;
+    if (keyEnd != that.keyEnd) return false;
     if (contig != null ? !contig.equals(that.contig) : that.contig != null) return false;
     return genotypes != null ? genotypes.equals(that.genotypes) : that.genotypes == null;
 
@@ -81,8 +81,8 @@ public class VariantLite implements Serializable {
     int result = contig != null ? contig.hashCode() : 0;
     result = 31 * result + start;
     result = 31 * result + end;
-    result = 31 * result + logicalStart;
-    result = 31 * result + logicalEnd;
+    result = 31 * result + keyStart;
+    result = 31 * result + keyEnd;
     result = 31 * result + (genotypes != null ? genotypes.hashCode() : 0);
     return result;
   }
@@ -93,8 +93,8 @@ public class VariantLite implements Serializable {
         "contig='" + contig + '\'' +
         ", start=" + start +
         ", end=" + end +
-        ", pos=" + logicalStart +
-        ", logicalEnd=" + logicalEnd +
+        ", keyStart=" + keyStart +
+        ", keyEnd=" + keyEnd +
         ", genotypes=" + genotypes +
         '}';
   }
