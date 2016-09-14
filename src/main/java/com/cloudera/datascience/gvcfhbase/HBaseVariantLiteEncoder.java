@@ -16,10 +16,13 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
     int end = variant.getEnd();
     int keyStart = variant.getKeyStart();
     int keyEnd = variant.getKeyEnd();
+    String ref = variant.getRef();
+    String alt = variant.getAlt();
     byte[] rowKey = toRowKeyBytes(variant.getContig(), keyStart);
     Put put = new Put(rowKey);
     byte[] qualifier = Bytes.toBytes(genotype.getSampleIndex());
-    String val = keyEnd + "," + start + "," + end + "," + genotype.getValue();
+    String val = keyEnd + "," + start + "," + end + "," + ref + "," + alt + "," +
+        genotype.getValue();
     byte[] value = Bytes.toBytes(val);
     put.addColumn(GVCFHBase.SAMPLE_COLUMN_FAMILY, qualifier, value);
     return put;
@@ -35,9 +38,11 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
     int keyEnd = Integer.parseInt(splits[0]);
     int start = Integer.parseInt(splits[1]);
     int end = Integer.parseInt(splits[2]);
-    GenotypeLite genotype = new GenotypeLite(sampleIndex, splits[3]);
-    return new VariantLite(rowKey.contig, start, end, rowKey.pos, keyEnd,
-        genotype);
+    String ref = splits[3];
+    String alt = splits[4];
+    GenotypeLite genotype = new GenotypeLite(sampleIndex, splits[5]);
+    return new VariantLite(rowKey.contig, start, end, ref, alt,
+        rowKey.pos, keyEnd, genotype);
   }
 
   @Override
@@ -71,9 +76,11 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
     String contig = variant.getContig();
     int start = variant.getStart();
     int end = variant.getEnd();
+    String ref = variant.getRef();
+    String alt = variant.getAlt();
     return new VariantLite[] {
-        new VariantLite(contig, start, end, start, key1End, variant.getGenotype()),
-        new VariantLite(contig, start, end, key2Start, end, variant.getGenotype())
+        new VariantLite(contig, start, end, ref, alt, start, key1End, variant.getGenotype()),
+        new VariantLite(contig, start, end, ref, alt, key2Start, end, variant.getGenotype())
     };
   }
 }

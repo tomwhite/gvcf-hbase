@@ -62,9 +62,9 @@ fields have been dropped for simplicity):
 
 ```
 #CHROM POS REF ALT INFO SAMPLE
-1 1 A G               0|0
+1 1 A G               0/1
 1 2 G <NON_REF> END=7 -  
-1 8 T C               1|1
+1 8 G C               1/1
 ```
 
 The block from 2 to 7 will be split into two when it is stored in HBase, since it 

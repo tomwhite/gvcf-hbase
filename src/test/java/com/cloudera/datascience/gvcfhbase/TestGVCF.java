@@ -48,11 +48,42 @@ public class TestGVCF implements Serializable {
 
   @Test
   public void test() throws Exception {
+    ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
+        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite(0, "0/1")),
+        new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite(0, "N/A")),
+        new VariantLite("20", 8, 8, "G", "C", new GenotypeLite(0, "1/1")));
+
+    ImmutableList<VariantLite> gvcf2 = ImmutableList.of(
+        new VariantLite("20", 1, 3, "A", "G", new GenotypeLite(1, "1/1")),
+        new VariantLite("20", 4, 6, "T", "C", new GenotypeLite(1, "0/0")),
+        new VariantLite("20", 7, 8, "A", "<NON_REF>", new GenotypeLite(1, "N/A")));
+
+    List<String> expectedAllPositions = ImmutableList.of(
+        "20:1,0/1(end=1),1/1(end=3)",
+        "20:2,N/A(end=7),1/1(end=3)",
+        "20:3,N/A(end=7),1/1(end=3)",
+        "20:4,N/A(end=7),0/0(end=6)",
+        "20:5,N/A(end=7),0/0(end=6)",
+        "20:6,N/A(end=7),0/0(end=6)",
+        "20:7,N/A(end=7),N/A(end=8)",
+        "20:8,1/1(end=8),N/A(end=8)");
+
+    List<String> expectedAllVariants = ImmutableList.of(
+        "20:1,0/1(end=1),1/1(end=3)",
+        "20:4,N/A(end=7),0/0(end=6)",
+        "20:8,1/1(end=8),N/A(end=8)");
+
+    check(gvcf1, gvcf2, expectedAllPositions, expectedAllVariants);
+  }
+
+  private void check(List<VariantLite> gvcf1, List<VariantLite> gvcf2,
+      List<String> expectedAllPositions, List<String> expectedAllVariants) throws Exception {
     int splitSize = 4;
 
     TableName tableName = TableName.valueOf("gvcf");
     byte[][] columnFamilies = new byte[][]{GVCFHBase.SAMPLE_COLUMN_FAMILY};
-    byte[][] splitKeys = new byte[][]{Bytes.toBytes(splitSize + 1)};
+    byte[][] splitKeys = new byte[][] {
+        HBaseVariantEncoder.getSplitKeyBytes("20", splitSize + 1)};
     HTable table = testUtil.createTable(tableName, columnFamilies, splitKeys);
 
     // create an RDD
@@ -62,26 +93,14 @@ public class TestGVCF implements Serializable {
         .set("spark.io.compression.codec", "lzf");
     JavaSparkContext jsc = new JavaSparkContext(sparkConf);
 
-    HBaseVariantEncoder<VariantLite> variantEncoder =
-        new HBaseVariantLiteEncoder();
-
-    ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
-        new VariantLite("20", 1, 1, new GenotypeLite(0, "0|0")),
-        new VariantLite("20", 2, 7, new GenotypeLite(0, "N/A")),
-        new VariantLite("20", 8, 8, new GenotypeLite(0, "1|1")));
-
-    ImmutableList<VariantLite> gvcf2 = ImmutableList.of(
-        new VariantLite("20", 1, 3, new GenotypeLite(1, "0|1")),
-        new VariantLite("20", 4, 6, new GenotypeLite(1, "0|0")),
-        new VariantLite("20", 7, 8, new GenotypeLite(1, "N/A")));
-
     JavaRDD<VariantLite> rdd1 = jsc.parallelize(gvcf1);
     JavaRDD<VariantLite> rdd2 = jsc.parallelize(gvcf2);
 
     // insert into HBase
-
     Configuration conf = testUtil.getConfiguration();
     JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, conf);
+    HBaseVariantEncoder<VariantLite> variantEncoder =
+        new HBaseVariantLiteEncoder();
     GVCFHBase.put(rdd1, variantEncoder, tableName, hbaseContext, splitSize);
     GVCFHBase.put(rdd2, variantEncoder, tableName, hbaseContext, splitSize);
 
@@ -90,15 +109,6 @@ public class TestGVCF implements Serializable {
         true, TestGVCF::process)
         .collect();
     //allPositions.forEach(System.out::println);
-    List<String> expectedAllPositions = ImmutableList.of(
-        "20:1,0|0(end=1),0|1(end=3)",
-        "20:2,N/A(end=7),0|1(end=3)",
-        "20:3,N/A(end=7),0|1(end=3)",
-        "20:4,N/A(end=7),0|0(end=6)",
-        "20:5,N/A(end=7),0|0(end=6)",
-        "20:6,N/A(end=7),0|0(end=6)",
-        "20:7,N/A(end=7),N/A(end=8)",
-        "20:8,1|1(end=8),N/A(end=8)");
     assertEquals(expectedAllPositions, allPositions);
 
     // Scan over variants only
@@ -106,10 +116,6 @@ public class TestGVCF implements Serializable {
         false, TestGVCF::process)
         .collect();
     //allVariants.forEach(System.out::println);
-    List<String> expectedAllVariants = ImmutableList.of(
-        "20:1,0|0(end=1),0|1(end=3)",
-        "20:4,N/A(end=7),0|0(end=6)",
-        "20:8,1|1(end=8),N/A(end=8)");
     assertEquals(expectedAllVariants, allVariants);
 
     testUtil.deleteTable(tableName);

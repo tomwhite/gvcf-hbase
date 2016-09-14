@@ -9,23 +9,28 @@ public class VariantLite implements Serializable {
   private String contig;
   private int start;
   private int end;
+  private String ref;
+  private String alt;
   private int keyStart;
   private int keyEnd;
   private List<GenotypeLite> genotypes;
 
-  public VariantLite(String contig,int start, int end, GenotypeLite genotype) {
-    this(contig, start, end, start, end, ImmutableList.of(genotype));
+  public VariantLite(String contig, int start, int end, String ref, String alt,
+      GenotypeLite genotype) {
+    this(contig, start, end, ref, alt, start, end, ImmutableList.of(genotype));
   }
 
-  public VariantLite(String contig, int start, int end, int keyStart, int
-      keyEnd, GenotypeLite genotype) {
-    this(contig, start, end, keyStart, keyEnd, ImmutableList.of(genotype));
+  public VariantLite(String contig, int start, int end, String ref, String alt,
+      int keyStart, int keyEnd, GenotypeLite genotype) {
+    this(contig, start, end, ref, alt, keyStart, keyEnd, ImmutableList.of(genotype));
   }
 
-  private VariantLite(String contig, int start, int end, int keyStart, int keyEnd,
-      List<GenotypeLite> genotypes) {
+  private VariantLite(String contig, int start, int end, String ref, String alt,
+      int keyStart, int keyEnd, List<GenotypeLite> genotypes) {
     this.contig = contig;
     this.start = start;
+    this.ref = ref;
+    this.alt = alt;
     this.end = end;
     this.keyStart = keyStart;
     this.keyEnd = keyEnd;
@@ -44,6 +49,14 @@ public class VariantLite implements Serializable {
     return end;
   }
 
+  public String getRef() {
+    return ref;
+  }
+
+  public String getAlt() {
+    return alt;
+  }
+
   public int getKeyStart() {
     return keyStart;
   }
@@ -60,6 +73,21 @@ public class VariantLite implements Serializable {
     return Iterables.getOnlyElement(genotypes);
   }
 
+
+  @Override
+  public String toString() {
+    return "VariantLite{" +
+        "contig='" + contig + '\'' +
+        ", start=" + start +
+        ", end=" + end +
+        ", ref='" + ref + '\'' +
+        ", alt='" + alt + '\'' +
+        ", keyStart=" + keyStart +
+        ", keyEnd=" + keyEnd +
+        ", genotypes=" + genotypes +
+        '}';
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -71,31 +99,23 @@ public class VariantLite implements Serializable {
     if (end != that.end) return false;
     if (keyStart != that.keyStart) return false;
     if (keyEnd != that.keyEnd) return false;
-    if (contig != null ? !contig.equals(that.contig) : that.contig != null) return false;
-    return genotypes != null ? genotypes.equals(that.genotypes) : that.genotypes == null;
+    if (!contig.equals(that.contig)) return false;
+    if (!ref.equals(that.ref)) return false;
+    if (alt != null ? !alt.equals(that.alt) : that.alt != null) return false;
+    return genotypes.equals(that.genotypes);
 
   }
 
   @Override
   public int hashCode() {
-    int result = contig != null ? contig.hashCode() : 0;
+    int result = contig.hashCode();
     result = 31 * result + start;
     result = 31 * result + end;
+    result = 31 * result + ref.hashCode();
+    result = 31 * result + (alt != null ? alt.hashCode() : 0);
     result = 31 * result + keyStart;
     result = 31 * result + keyEnd;
-    result = 31 * result + (genotypes != null ? genotypes.hashCode() : 0);
+    result = 31 * result + genotypes.hashCode();
     return result;
-  }
-
-  @Override
-  public String toString() {
-    return "VariantLite{" +
-        "contig='" + contig + '\'' +
-        ", start=" + start +
-        ", end=" + end +
-        ", keyStart=" + keyStart +
-        ", keyEnd=" + keyEnd +
-        ", genotypes=" + genotypes +
-        '}';
   }
 }
