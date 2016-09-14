@@ -50,28 +50,28 @@ public class TestGVCF implements Serializable {
   public void test() throws Exception {
     ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
         new VariantLite("20", 1, 1, "A", "G", new GenotypeLite(0, "0/1")),
-        new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite(0, "N/A")),
+        new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite(0, "0/0")),
         new VariantLite("20", 8, 8, "G", "C", new GenotypeLite(0, "1/1")));
 
     ImmutableList<VariantLite> gvcf2 = ImmutableList.of(
         new VariantLite("20", 1, 3, "A", "G", new GenotypeLite(1, "1/1")),
         new VariantLite("20", 4, 6, "T", "C", new GenotypeLite(1, "0/0")),
-        new VariantLite("20", 7, 8, "A", "<NON_REF>", new GenotypeLite(1, "N/A")));
+        new VariantLite("20", 7, 8, "A", "<NON_REF>", new GenotypeLite(1, "0/0")));
 
     List<String> expectedAllPositions = ImmutableList.of(
         "20:1,0/1(end=1),1/1(end=3)",
-        "20:2,N/A(end=7),1/1(end=3)",
-        "20:3,N/A(end=7),1/1(end=3)",
-        "20:4,N/A(end=7),0/0(end=6)",
-        "20:5,N/A(end=7),0/0(end=6)",
-        "20:6,N/A(end=7),0/0(end=6)",
-        "20:7,N/A(end=7),N/A(end=8)",
-        "20:8,1/1(end=8),N/A(end=8)");
+        "20:2,0/0(end=7),1/1(end=3)",
+        "20:3,0/0(end=7),1/1(end=3)",
+        "20:4,0/0(end=7),0/0(end=6)",
+        "20:5,0/0(end=7),0/0(end=6)",
+        "20:6,0/0(end=7),0/0(end=6)",
+        "20:7,0/0(end=7),0/0(end=8)",
+        "20:8,1/1(end=8),0/0(end=8)");
 
     List<String> expectedAllVariants = ImmutableList.of(
         "20:1,0/1(end=1),1/1(end=3)",
-        "20:4,N/A(end=7),0/0(end=6)",
-        "20:8,1/1(end=8),N/A(end=8)");
+        "20:4,0/0(end=7),0/0(end=6)",
+        "20:8,1/1(end=8),0/0(end=8)");
 
     check(gvcf1, gvcf2, expectedAllPositions, expectedAllVariants);
   }
