@@ -38,6 +38,8 @@ public class TestGVCF implements Serializable {
     sb.append(rowKey.contig).append(":").append(rowKey.pos).append(",");
     for (VariantLite variant : variants) {
       GenotypeLite genotype = variant.getGenotype();
+      sb.append(variant.getRef()).append(":");
+      sb.append(variant.getAlt()).append(":");
       sb.append(genotype.getValue());
       sb.append("(end=").append(variant.getEnd()).append(")");
       sb.append(",");
@@ -47,7 +49,7 @@ public class TestGVCF implements Serializable {
   }
 
   @Test
-  public void test() throws Exception {
+  public void testComplex() throws Exception {
     ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
         new VariantLite("20", 1, 1, "A", "G", new GenotypeLite(0, "0/1")),
         new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite(0, "0/0")),
@@ -59,19 +61,19 @@ public class TestGVCF implements Serializable {
         new VariantLite("20", 7, 8, "A", "<NON_REF>", new GenotypeLite(1, "0/0")));
 
     List<String> expectedAllPositions = ImmutableList.of(
-        "20:1,0/1(end=1),1/1(end=3)",
-        "20:2,0/0(end=7),1/1(end=3)",
-        "20:3,0/0(end=7),1/1(end=3)",
-        "20:4,0/0(end=7),0/0(end=6)",
-        "20:5,0/0(end=7),0/0(end=6)",
-        "20:6,0/0(end=7),0/0(end=6)",
-        "20:7,0/0(end=7),0/0(end=8)",
-        "20:8,1/1(end=8),0/0(end=8)");
+        "20:1,A:G:0/1(end=1),A:G:1/1(end=3)",
+        "20:2,G:<NON_REF>:0/0(end=7),A:G:1/1(end=3)",
+        "20:3,G:<NON_REF>:0/0(end=7),A:G:1/1(end=3)",
+        "20:4,G:<NON_REF>:0/0(end=7),T:C:0/0(end=6)",
+        "20:5,G:<NON_REF>:0/0(end=7),T:C:0/0(end=6)",
+        "20:6,G:<NON_REF>:0/0(end=7),T:C:0/0(end=6)",
+        "20:7,G:<NON_REF>:0/0(end=7),A:<NON_REF>:0/0(end=8)",
+        "20:8,G:C:1/1(end=8),A:<NON_REF>:0/0(end=8)");
 
     List<String> expectedAllVariants = ImmutableList.of(
-        "20:1,0/1(end=1),1/1(end=3)",
-        "20:4,0/0(end=7),0/0(end=6)",
-        "20:8,1/1(end=8),0/0(end=8)");
+        "20:1,A:G:0/1(end=1),A:G:1/1(end=3)",
+        "20:4,G:<NON_REF>:0/0(end=7),T:C:0/0(end=6)",
+        "20:8,G:C:1/1(end=8),A:<NON_REF>:0/0(end=8)");
 
     check(gvcf1, gvcf2, expectedAllPositions, expectedAllVariants);
   }
@@ -89,18 +91,18 @@ public class TestGVCF implements Serializable {
         new VariantLite("20", 8, 8, "G", "C", new GenotypeLite(1, "0/1")));
 
     List<String> expectedAllPositions = ImmutableList.of(
-        "20:1,0/1(end=1),1/1(end=1)",
-        "20:2,0/0(end=7),0/0(end=7)",
-        "20:3,0/0(end=7),0/0(end=7)",
-        "20:4,0/0(end=7),0/0(end=7)",
-        "20:5,0/0(end=7),0/0(end=7)",
-        "20:6,0/0(end=7),0/0(end=7)",
-        "20:7,0/0(end=7),0/0(end=7)",
-        "20:8,1/1(end=8),0/1(end=8)");
+        "20:1,A:G:0/1(end=1),A:G:1/1(end=1)",
+        "20:2,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
+        "20:3,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
+        "20:4,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
+        "20:5,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
+        "20:6,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
+        "20:7,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
+        "20:8,G:C:1/1(end=8),G:C:0/1(end=8)");
 
     List<String> expectedAllVariants = ImmutableList.of(
-        "20:1,0/1(end=1),1/1(end=1)",
-        "20:8,1/1(end=8),0/1(end=8)");
+        "20:1,A:G:0/1(end=1),A:G:1/1(end=1)",
+        "20:8,G:C:1/1(end=8),G:C:0/1(end=8)");
 
     check(gvcf1, gvcf2, expectedAllPositions, expectedAllVariants);
   }
