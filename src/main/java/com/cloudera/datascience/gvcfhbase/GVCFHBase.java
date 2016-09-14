@@ -80,7 +80,10 @@ public class GVCFHBase {
               nextKeyEnd = Math.min(variantEncoder.getKeyEnd(variant), nextKeyEnd);
             }
 
-            output.add(f.call(rowKey, variantsBySampleIndex));
+            List<V> variants = variantEncoder.adjustEnds(variantsBySampleIndex,
+                rowKey.pos, nextKeyEnd);
+
+            output.add(f.call(rowKey, variants));
           }
           return output;
         });

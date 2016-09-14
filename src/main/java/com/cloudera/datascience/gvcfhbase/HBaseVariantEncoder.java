@@ -1,5 +1,6 @@
 package com.cloudera.datascience.gvcfhbase;
 
+import java.util.List;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
@@ -19,6 +20,7 @@ public abstract class HBaseVariantEncoder<V> {
   public abstract int getEnd(V variant);
   public abstract int getKeyEnd(V variant);
   public abstract V[] split(V v, int key1End, int key2Start);
+  public abstract List<V> adjustEnds(List<V> variantsBySampleIndex, int start, int nextKeyEnd);
 
   private static final int CONTIG_LENGTH = 2;
 

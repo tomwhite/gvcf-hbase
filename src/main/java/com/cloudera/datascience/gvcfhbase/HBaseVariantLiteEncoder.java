@@ -1,6 +1,8 @@
 package com.cloudera.datascience.gvcfhbase;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -82,5 +84,22 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
         new VariantLite(contig, start, end, ref, alt, start, key1End, variant.getGenotype()),
         new VariantLite(contig, start, end, ref, alt, key2Start, end, variant.getGenotype())
     };
+  }
+
+  @Override
+  public List<VariantLite> adjustEnds(List<VariantLite> variantsBySampleIndex, int start, int nextKeyEnd) {
+    List<VariantLite> variants = new ArrayList<>();
+    for (VariantLite v : variantsBySampleIndex) {
+      if (v.getAlt().equals("<NON_REF>")) {
+        String ref = start == v.getStart() ? v.getRef() : "."; // unknown ref (TODO:use fasta)
+        int end = nextKeyEnd < v.getEnd() ? nextKeyEnd : v.getEnd();
+        VariantLite variant = new VariantLite(v.getContig(), start, end,
+            ref, v.getAlt(), v.getKeyStart(), v.getKeyEnd(), v.getGenotype());
+        variants.add(variant);
+      } else {
+        variants.add(v);
+      }
+    }
+    return variants;
   }
 }
