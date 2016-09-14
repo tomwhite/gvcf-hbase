@@ -76,6 +76,35 @@ public class TestGVCF implements Serializable {
     check(gvcf1, gvcf2, expectedAllPositions, expectedAllVariants);
   }
 
+  @Test
+  public void testMatchingBlocks() throws Exception {
+    ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
+        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite(0, "0/1")),
+        new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite(0, "0/0")),
+        new VariantLite("20", 8, 8, "G", "C", new GenotypeLite(0, "1/1")));
+
+    ImmutableList<VariantLite> gvcf2 = ImmutableList.of(
+        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite(1, "1/1")),
+        new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite(1, "0/0")),
+        new VariantLite("20", 8, 8, "G", "C", new GenotypeLite(1, "0/1")));
+
+    List<String> expectedAllPositions = ImmutableList.of(
+        "20:1,0/1(end=1),1/1(end=1)",
+        "20:2,0/0(end=7),0/0(end=7)",
+        "20:3,0/0(end=7),0/0(end=7)",
+        "20:4,0/0(end=7),0/0(end=7)",
+        "20:5,0/0(end=7),0/0(end=7)",
+        "20:6,0/0(end=7),0/0(end=7)",
+        "20:7,0/0(end=7),0/0(end=7)",
+        "20:8,1/1(end=8),0/1(end=8)");
+
+    List<String> expectedAllVariants = ImmutableList.of(
+        "20:1,0/1(end=1),1/1(end=1)",
+        "20:8,1/1(end=8),0/1(end=8)");
+
+    check(gvcf1, gvcf2, expectedAllPositions, expectedAllVariants);
+  }
+
   private void check(List<VariantLite> gvcf1, List<VariantLite> gvcf2,
       List<String> expectedAllPositions, List<String> expectedAllVariants) throws Exception {
     int splitSize = 4;
