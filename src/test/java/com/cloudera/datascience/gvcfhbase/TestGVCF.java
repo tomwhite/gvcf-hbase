@@ -90,6 +90,20 @@ public class TestGVCF implements Serializable {
     check(gvcf1, gvcf2, expectedAllVariants);
   }
 
+  @Test
+  public void testSNPAndNonRef() throws Exception {
+    ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
+        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite(0, "0/1")));
+
+    ImmutableList<VariantLite> gvcf2 = ImmutableList.of(
+        new VariantLite("20", 1, 1, "A", "<NON_REF>", new GenotypeLite(1, "0/0")));
+
+    List<String> expectedAllVariants = ImmutableList.of(
+        "20:1,A:G:0/1(end=1),A:<NON_REF>:0/0(end=1)");
+
+    check(gvcf1, gvcf2, expectedAllVariants);
+  }
+
   private void check(List<VariantLite> gvcf1, List<VariantLite> gvcf2,
       List<String> expectedAllVariants) throws Exception {
     int splitSize = 4;
