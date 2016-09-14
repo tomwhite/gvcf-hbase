@@ -8,7 +8,6 @@ import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.spark.JavaHBaseContext;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -62,22 +61,12 @@ public class TestGVCF implements Serializable {
         new VariantLite("20", 4, 6, "T", "C", new GenotypeLite(1, "0/0")),
         new VariantLite("20", 7, 8, "A", "<NON_REF>", new GenotypeLite(1, "0/0")));
 
-    List<String> expectedAllPositions = ImmutableList.of(
-        "20:1,A:G:0/1(end=1),A:G:1/1(end=3)",
-        "20:2,G:<NON_REF>:0/0(end=7),A:G:1/1(end=3)",
-        "20:3,G:<NON_REF>:0/0(end=7),A:G:1/1(end=3)",
-        "20:4,G:<NON_REF>:0/0(end=7),T:C:0/0(end=6)",
-        "20:5,G:<NON_REF>:0/0(end=7),T:C:0/0(end=6)",
-        "20:6,G:<NON_REF>:0/0(end=7),T:C:0/0(end=6)",
-        "20:7,G:<NON_REF>:0/0(end=7),A:<NON_REF>:0/0(end=8)",
-        "20:8,G:C:1/1(end=8),A:<NON_REF>:0/0(end=8)");
-
     List<String> expectedAllVariants = ImmutableList.of(
         "20:1,A:G:0/1(end=1),A:G:1/1(end=3)",
         "20:4,G:<NON_REF>:0/0(end=7),T:C:0/0(end=6)",
         "20:8,G:C:1/1(end=8),A:<NON_REF>:0/0(end=8)");
 
-    check(gvcf1, gvcf2, expectedAllPositions, expectedAllVariants);
+    check(gvcf1, gvcf2, expectedAllVariants);
   }
 
   @Test
@@ -92,25 +81,17 @@ public class TestGVCF implements Serializable {
         new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite(1, "0/0")),
         new VariantLite("20", 8, 8, "G", "C", new GenotypeLite(1, "0/1")));
 
-    List<String> expectedAllPositions = ImmutableList.of(
-        "20:1,A:G:0/1(end=1),A:G:1/1(end=1)",
-        "20:2,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
-        "20:3,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
-        "20:4,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
-        "20:5,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
-        "20:6,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
-        "20:7,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
-        "20:8,G:C:1/1(end=8),G:C:0/1(end=8)");
-
     List<String> expectedAllVariants = ImmutableList.of(
         "20:1,A:G:0/1(end=1),A:G:1/1(end=1)",
+        "20:2,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
+        "20:5,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)", // due to split
         "20:8,G:C:1/1(end=8),G:C:0/1(end=8)");
 
-    check(gvcf1, gvcf2, expectedAllPositions, expectedAllVariants);
+    check(gvcf1, gvcf2, expectedAllVariants);
   }
 
   private void check(List<VariantLite> gvcf1, List<VariantLite> gvcf2,
-      List<String> expectedAllPositions, List<String> expectedAllVariants) throws Exception {
+      List<String> expectedAllVariants) throws Exception {
     int splitSize = 4;
 
     TableName tableName = TableName.valueOf("gvcf");
@@ -137,16 +118,9 @@ public class TestGVCF implements Serializable {
     GVCFHBase.put(rdd1, variantEncoder, tableName, hbaseContext, splitSize);
     GVCFHBase.put(rdd2, variantEncoder, tableName, hbaseContext, splitSize);
 
-    // Scan over all positions
-    List<String> allPositions = GVCFHBase.scan(variantEncoder, tableName, hbaseContext,
-        true, TestGVCF::process)
-        .collect();
-    //allPositions.forEach(System.out::println);
-    assertEquals(expectedAllPositions, allPositions);
-
-    // Scan over variants only
+    // Scan over variants
     List<String> allVariants = GVCFHBase.scan(variantEncoder, tableName, hbaseContext,
-        false, TestGVCF::process)
+        TestGVCF::process)
         .collect();
     //allVariants.forEach(System.out::println);
     assertEquals(expectedAllVariants, allVariants);

@@ -51,7 +51,7 @@ public class GVCFHBase {
   @SuppressWarnings("unchecked")
   public static <T, V> JavaRDD<T> scan(HBaseVariantEncoder<V> variantEncoder,
       TableName tableName, JavaHBaseContext
-      hbaseContext, boolean allPositions, Function2<RowKey, Iterable<V>, T> f) {
+      hbaseContext, Function2<RowKey, Iterable<V>, T> f) {
     Scan scan = new Scan();
     scan.setCaching(100);
     return hbaseContext.hbaseRDD(tableName, scan)
@@ -70,13 +70,9 @@ public class GVCFHBase {
               variantsBySampleIndex = Arrays.asList((V[]) new Object[numSamples]);
             }
             RowKey rowKey = variantEncoder.fromRowKeyBytes(result.getRow());
-            boolean isVariantPos = false;
             for (Cell cell : result.listCells()) {
               V variant = variantEncoder.decodeVariant(rowKey, cell);
               variantsBySampleIndex.set(variantEncoder.getSampleIndex(variant), variant);
-              if (variantEncoder.isRefPosition(rowKey, variant)) {
-                isVariantPos = true;
-              }
             }
             int nextKeyEnd = Integer.MAX_VALUE; // how many positions we can
             // iterate over before the next row
@@ -84,13 +80,7 @@ public class GVCFHBase {
               nextKeyEnd = Math.min(variantEncoder.getKeyEnd(variant), nextKeyEnd);
             }
 
-            if (allPositions) {
-              for (; rowKey.pos <= nextKeyEnd; rowKey.pos++) {
-                output.add(f.call(rowKey, variantsBySampleIndex));
-              }
-            } else if (isVariantPos) {
-              output.add(f.call(rowKey, variantsBySampleIndex));
-            }
+            output.add(f.call(rowKey, variantsBySampleIndex));
           }
           return output;
         });
