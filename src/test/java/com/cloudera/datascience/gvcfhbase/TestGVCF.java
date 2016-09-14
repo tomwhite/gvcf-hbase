@@ -14,6 +14,7 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -49,6 +50,7 @@ public class TestGVCF implements Serializable {
   }
 
   @Test
+  @Ignore
   public void testComplex() throws Exception {
     ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
         new VariantLite("20", 1, 1, "A", "G", new GenotypeLite(0, "0/1")),
