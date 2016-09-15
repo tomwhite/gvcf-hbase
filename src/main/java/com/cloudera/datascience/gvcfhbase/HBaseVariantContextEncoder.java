@@ -1,8 +1,6 @@
 package com.cloudera.datascience.gvcfhbase;
 
 import com.clearspring.analytics.util.Lists;
-import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -13,9 +11,7 @@ import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -50,7 +46,7 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     List<Allele> alleles = variant.getAlleles();
     String ref = alleles.get(0).getDisplayString();
     String alt = alleles.get(1).getDisplayString();
-    byte[] rowKey = toRowKeyBytes(variant.getContig(), keyStart);
+    byte[] rowKey = RowKey.toRowKeyBytes(variant.getContig(), keyStart);
     Put put = new Put(rowKey);
     byte[] qualifier = Bytes.toBytes(sampleIndex);
     String val = keyEnd + "," + start + "," + end + "," + ref + "," + alt + "," +
@@ -95,11 +91,6 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     List<Allele> genotypeAlleles = allelesFromString(splits[5], alleles);
     Genotype genotype = new GenotypeBuilder(sampleName).alleles(genotypeAlleles).make();
     return newVariantContext(rowKey.contig, start, end, ref, alt, rowKey.pos, keyEnd, genotype);
-  }
-
-  @Override
-  public boolean isRefPosition(RowKey rowKey, VariantContext variant) {
-    return true; // TODO: not used
   }
 
   @Override

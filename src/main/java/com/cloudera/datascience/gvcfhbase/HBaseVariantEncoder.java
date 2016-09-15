@@ -15,31 +15,10 @@ public abstract class HBaseVariantEncoder<V> {
   public abstract int getNumSamples();
   public abstract Put encodeVariant(V variant);
   public abstract V decodeVariant(RowKey rowKey, Cell cell);
-  public abstract boolean isRefPosition(RowKey rowKey, V variant);
   public abstract int getSampleIndex(V variant);
   public abstract int getStart(V variant);
   public abstract int getEnd(V variant);
   public abstract int getKeyEnd(V variant);
   public abstract V[] split(V v, int key1End, int key2Start);
   public abstract List<V> adjustEnds(List<V> variantsBySampleIndex, int start, int nextKeyEnd);
-
-  private static final int CONTIG_LENGTH = 2;
-
-  public static byte[] getSplitKeyBytes(String contig, int keyStart) {
-    return toRowKeyBytes(contig, keyStart);
-  }
-
-  public static byte[] toRowKeyBytes(String contig, int keyStart) {
-    byte[] row = new byte[CONTIG_LENGTH + Bytes.SIZEOF_INT];
-    Bytes.putBytes(row, 0, Bytes.toBytes(StringUtils.leftPad(contig, 2)), 0, CONTIG_LENGTH);
-    Bytes.putInt(row, CONTIG_LENGTH, keyStart);
-    return row;
-  }
-
-  public static RowKey fromRowKeyBytes(byte[] row) {
-    return new RowKey(
-        Bytes.toString(row, 0, CONTIG_LENGTH).trim(),
-        Bytes.toInt(row, CONTIG_LENGTH)
-    );
-  }
 }

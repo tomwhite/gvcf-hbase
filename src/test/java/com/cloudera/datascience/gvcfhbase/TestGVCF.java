@@ -45,7 +45,7 @@ public class TestGVCF implements Serializable {
   public void setup() throws IOException {
     byte[][] columnFamilies = new byte[][]{GVCFHBase.SAMPLE_COLUMN_FAMILY};
     byte[][] splitKeys = new byte[][] {
-        HBaseVariantEncoder.getSplitKeyBytes("20", splitSize + 1)};
+        RowKey.getSplitKeyBytes("20", splitSize + 1)};
     HTable table = testUtil.createTable(tableName, columnFamilies, splitKeys);
   }
 

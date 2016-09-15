@@ -20,7 +20,6 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
     this.sampleNameIndex = sampleNameIndex;
   }
 
-
   @Override
   public int getNumSamples() {
     return sampleNameIndex.getNumSamples();
@@ -37,7 +36,7 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
     int keyEnd = variant.getKeyEnd();
     String ref = variant.getRef();
     String alt = variant.getAlt();
-    byte[] rowKey = toRowKeyBytes(variant.getContig(), keyStart);
+    byte[] rowKey = RowKey.toRowKeyBytes(variant.getContig(), keyStart);
     Put put = new Put(rowKey);
     byte[] qualifier = Bytes.toBytes(sampleNameIndex.getSampleIndex(genotype.getSampleName()));
     String val = keyEnd + "," + start + "," + end + "," + ref + "," + alt + "," +
@@ -63,12 +62,6 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
     GenotypeLite genotype = new GenotypeLite(sampleName, splits[5]);
     return new VariantLite(rowKey.contig, start, end, ref, alt,
         rowKey.pos, keyEnd, genotype);
-  }
-
-  @Override
-  public boolean isRefPosition(RowKey rowKey, VariantLite variant) {
-    return !variant.getAlt().equals("<NON_REF>") &&
-        rowKey.pos == variant.getStart();
   }
 
   @Override

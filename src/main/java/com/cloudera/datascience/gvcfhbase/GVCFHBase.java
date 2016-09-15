@@ -63,7 +63,7 @@ public class GVCFHBase {
           while (rows.hasNext()) {
             Tuple2<ImmutableBytesWritable, Result> row = rows.next();
             Result result = row._2();
-            RowKey rowKey = variantEncoder.fromRowKeyBytes(result.getRow());
+            RowKey rowKey = RowKey.fromRowKeyBytes(result.getRow());
             for (Cell cell : result.listCells()) {
               V variant = variantEncoder.decodeVariant(rowKey, cell);
               variantsBySampleIndex.set(variantEncoder.getSampleIndex(variant), variant);
