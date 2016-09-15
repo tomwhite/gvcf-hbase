@@ -12,6 +12,7 @@ import org.apache.hadoop.hbase.util.Bytes;
  * @param <V>
  */
 public abstract class HBaseVariantEncoder<V> {
+  public abstract int getNumSamples();
   public abstract Put encodeVariant(V variant);
   public abstract V decodeVariant(RowKey rowKey, Cell cell);
   public abstract boolean isRefPosition(RowKey rowKey, V variant);

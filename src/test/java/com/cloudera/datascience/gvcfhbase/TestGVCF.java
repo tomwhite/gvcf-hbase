@@ -52,14 +52,14 @@ public class TestGVCF implements Serializable {
   @Ignore
   public void testComplex() throws Exception {
     ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
-        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite(0, "0/1")),
-        new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite(0, "0/0")),
-        new VariantLite("20", 8, 8, "G", "C", new GenotypeLite(0, "1/1")));
+        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite("a", "0/1")),
+        new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite("a", "0/0")),
+        new VariantLite("20", 8, 8, "G", "C", new GenotypeLite("a", "1/1")));
 
     ImmutableList<VariantLite> gvcf2 = ImmutableList.of(
-        new VariantLite("20", 1, 3, "A", "G", new GenotypeLite(1, "1/1")),
-        new VariantLite("20", 4, 6, "T", "C", new GenotypeLite(1, "0/0")),
-        new VariantLite("20", 7, 8, "A", "<NON_REF>", new GenotypeLite(1, "0/0")));
+        new VariantLite("20", 1, 3, "A", "G", new GenotypeLite("b", "1/1")),
+        new VariantLite("20", 4, 6, "T", "C", new GenotypeLite("b", "0/0")),
+        new VariantLite("20", 7, 8, "A", "<NON_REF>", new GenotypeLite("b", "0/0")));
 
     List<String> expectedAllVariants = ImmutableList.of(
         "20:1,A:G:0/1(end=1),A:G:1/1(end=3)",
@@ -72,14 +72,14 @@ public class TestGVCF implements Serializable {
   @Test
   public void testMatchingBlocks() throws Exception {
     ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
-        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite(0, "0/1")),
-        new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite(0, "0/0")),
-        new VariantLite("20", 8, 8, "G", "C", new GenotypeLite(0, "1/1")));
+        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite("a", "0/1")),
+        new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite("a", "0/0")),
+        new VariantLite("20", 8, 8, "G", "C", new GenotypeLite("a", "1/1")));
 
     ImmutableList<VariantLite> gvcf2 = ImmutableList.of(
-        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite(1, "1/1")),
-        new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite(1, "0/0")),
-        new VariantLite("20", 8, 8, "G", "C", new GenotypeLite(1, "0/1")));
+        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite("b", "1/1")),
+        new VariantLite("20", 2, 7, "G", "<NON_REF>", new GenotypeLite("b", "0/0")),
+        new VariantLite("20", 8, 8, "G", "C", new GenotypeLite("b", "0/1")));
 
     List<String> expectedAllVariants = ImmutableList.of(
         "20:1,A:G:0/1(end=1),A:G:1/1(end=1)",
@@ -93,10 +93,10 @@ public class TestGVCF implements Serializable {
   @Test
   public void testSNPAndNonRef() throws Exception {
     ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
-        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite(0, "0/1")));
+        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite("a", "0/1")));
 
     ImmutableList<VariantLite> gvcf2 = ImmutableList.of(
-        new VariantLite("20", 1, 1, "A", "<NON_REF>", new GenotypeLite(1, "0/0")));
+        new VariantLite("20", 1, 1, "A", "<NON_REF>", new GenotypeLite("b", "0/0")));
 
     List<String> expectedAllVariants = ImmutableList.of(
         "20:1,A:G:0/1(end=1),A:<NON_REF>:0/0(end=1)");
@@ -107,11 +107,11 @@ public class TestGVCF implements Serializable {
   @Test
   public void testSNPAndNonRefBlock() throws Exception {
     ImmutableList<VariantLite> gvcf1 = ImmutableList.of(
-        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite(0, "0/1")),
-        new VariantLite("20", 2, 2, "G", "<NON_REF>", new GenotypeLite(0, "0/0")));
+        new VariantLite("20", 1, 1, "A", "G", new GenotypeLite("a", "0/1")),
+        new VariantLite("20", 2, 2, "G", "<NON_REF>", new GenotypeLite("a", "0/0")));
 
     ImmutableList<VariantLite> gvcf2 = ImmutableList.of(
-        new VariantLite("20", 1, 2, "A", "<NON_REF>", new GenotypeLite(1, "0/0")));
+        new VariantLite("20", 1, 2, "A", "<NON_REF>", new GenotypeLite("b", "0/0")));
 
     List<String> expectedAllVariants = ImmutableList.of(
         "20:1,A:G:0/1(end=1),A:<NON_REF>:0/0(end=1)",
@@ -143,8 +143,9 @@ public class TestGVCF implements Serializable {
     // insert into HBase
     Configuration conf = testUtil.getConfiguration();
     JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, conf);
+    SampleNameIndex sampleNameIndex = new SampleNameIndex(ImmutableList.of("a", "b"));
     HBaseVariantEncoder<VariantLite> variantEncoder =
-        new HBaseVariantLiteEncoder();
+        new HBaseVariantLiteEncoder(sampleNameIndex);
     GVCFHBase.put(rdd1, variantEncoder, tableName, hbaseContext, splitSize);
     GVCFHBase.put(rdd2, variantEncoder, tableName, hbaseContext, splitSize);
 

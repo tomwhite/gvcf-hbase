@@ -58,24 +58,18 @@ public class GVCFHBase {
         .mapPartitions((FlatMapFunction<Iterator<Tuple2<ImmutableBytesWritable,
             Result>>, T>) rows -> {
           List<T> output = new ArrayList<>();
-          List<V> variantsBySampleIndex = new ArrayList<>();
-          int numSamples = -1;
+          int numSamples = variantEncoder.getNumSamples();
+          List<V> variantsBySampleIndex = Arrays.asList((V[]) new Object[numSamples]);
           while (rows.hasNext()) {
             Tuple2<ImmutableBytesWritable, Result> row = rows.next();
             Result result = row._2();
-            // determine number of samples from first row in split,
-            // since they all have an entry there
-            if (numSamples == -1) {
-              numSamples = result.listCells().size();
-              variantsBySampleIndex = Arrays.asList((V[]) new Object[numSamples]);
-            }
             RowKey rowKey = variantEncoder.fromRowKeyBytes(result.getRow());
             for (Cell cell : result.listCells()) {
               V variant = variantEncoder.decodeVariant(rowKey, cell);
               variantsBySampleIndex.set(variantEncoder.getSampleIndex(variant), variant);
             }
-            int nextKeyEnd = Integer.MAX_VALUE; // how many positions we can
-            // iterate over before the next row
+            // how many positions we can iterate over before the next row
+            int nextKeyEnd = Integer.MAX_VALUE;
             for (V variant : variantsBySampleIndex) {
               nextKeyEnd = Math.min(variantEncoder.getKeyEnd(variant), nextKeyEnd);
             }

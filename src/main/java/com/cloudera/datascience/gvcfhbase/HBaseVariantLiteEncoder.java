@@ -9,6 +9,19 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
     implements Serializable {
+
+  private SampleNameIndex sampleNameIndex;
+
+  public HBaseVariantLiteEncoder(SampleNameIndex sampleNameIndex) {
+    this.sampleNameIndex = sampleNameIndex;
+  }
+
+
+  @Override
+  public int getNumSamples() {
+    return sampleNameIndex.getNumSamples();
+  }
+
   @Override
   public Put encodeVariant(VariantLite variant) {
     // note that we only store one genotype here as we expect to load single sample
@@ -22,7 +35,7 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
     String alt = variant.getAlt();
     byte[] rowKey = toRowKeyBytes(variant.getContig(), keyStart);
     Put put = new Put(rowKey);
-    byte[] qualifier = Bytes.toBytes(genotype.getSampleIndex());
+    byte[] qualifier = Bytes.toBytes(sampleNameIndex.getSampleIndex(genotype.getSampleName()));
     String val = keyEnd + "," + start + "," + end + "," + ref + "," + alt + "," +
         genotype.getValue();
     byte[] value = Bytes.toBytes(val);
@@ -34,6 +47,7 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
   public VariantLite decodeVariant(RowKey rowKey, Cell cell) {
     int sampleIndex = Bytes.toInt(cell.getQualifierArray(),
         cell.getQualifierOffset(), cell.getQualifierLength());
+    String sampleName = sampleNameIndex.getSampleName(sampleIndex);
     String val = Bytes.toString(cell.getValueArray(), cell.getValueOffset(),
         cell.getValueLength());
     String[] splits = val.split(",");
@@ -42,7 +56,7 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
     int end = Integer.parseInt(splits[2]);
     String ref = splits[3];
     String alt = splits[4];
-    GenotypeLite genotype = new GenotypeLite(sampleIndex, splits[5]);
+    GenotypeLite genotype = new GenotypeLite(sampleName, splits[5]);
     return new VariantLite(rowKey.contig, start, end, ref, alt,
         rowKey.pos, keyEnd, genotype);
   }
@@ -55,7 +69,7 @@ public class HBaseVariantLiteEncoder extends HBaseVariantEncoder<VariantLite>
 
   @Override
   public int getSampleIndex(VariantLite variant) {
-    return variant.getGenotype().getSampleIndex();
+    return sampleNameIndex.getSampleIndex(variant.getGenotype().getSampleName());
   }
 
   @Override
