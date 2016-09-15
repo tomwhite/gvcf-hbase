@@ -26,7 +26,8 @@ storage, such as Parquet or Kudu.
 We would like to have a storage layer for GVCF data with the following operations in 
 the workflow:
 
-1. For each new sample in the batch, store all positions and variants in the GVCF file
+1. For each new sample in the batch, store all positions and variants in the GVCF file 
+in HBase.
 2. For each variant in the store, read all genotypes for all samples
 3. For each position, read all genotypes for all samples
 
@@ -45,8 +46,6 @@ Row keys are made up of the following fields:
 
 1. the contig
 2. the base pair position
-3. the reference allele
-4. the alternate allele
 
 [TODO: describe how row keys are encoded]
 

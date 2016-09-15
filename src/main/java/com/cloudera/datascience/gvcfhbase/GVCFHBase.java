@@ -1,6 +1,8 @@
 package com.cloudera.datascience.gvcfhbase;
 
+import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
+import htsjdk.samtools.util.IterableOnceIterator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -57,29 +59,37 @@ public class GVCFHBase {
     return hbaseContext.hbaseRDD(tableName, scan)
         .mapPartitions((FlatMapFunction<Iterator<Tuple2<ImmutableBytesWritable,
             Result>>, T>) rows -> {
-          List<T> output = new ArrayList<>();
           int numSamples = variantEncoder.getNumSamples();
-          List<V> variantsBySampleIndex = Arrays.asList((V[]) new Object[numSamples]);
-          while (rows.hasNext()) {
-            Tuple2<ImmutableBytesWritable, Result> row = rows.next();
-            Result result = row._2();
-            RowKey rowKey = RowKey.fromRowKeyBytes(result.getRow());
-            for (Cell cell : result.listCells()) {
-              V variant = variantEncoder.decodeVariant(rowKey, cell);
-              variantsBySampleIndex.set(variantEncoder.getSampleIndex(variant), variant);
-            }
-            // how many positions we can iterate over before the next row
-            int nextKeyEnd = Integer.MAX_VALUE;
-            for (V variant : variantsBySampleIndex) {
-              nextKeyEnd = Math.min(variantEncoder.getKeyEnd(variant), nextKeyEnd);
-            }
+          final List<V> variantsBySampleIndex = Arrays.asList((V[]) new Object[numSamples]);
+          Iterator<T> it = new AbstractIterator<T>() {
+            @Override
+            protected T computeNext() {
+              if (!rows.hasNext()) {
+                return endOfData();
+              }
+              Tuple2<ImmutableBytesWritable, Result> row = rows.next();
+              Result result = row._2();
+              RowKey rowKey = RowKey.fromRowKeyBytes(result.getRow());
+              for (Cell cell : result.listCells()) {
+                V variant = variantEncoder.decodeVariant(rowKey, cell);
+                variantsBySampleIndex.set(variantEncoder.getSampleIndex(variant), variant);
+              }
+              // how many positions we can iterate over before the next row
+              int nextKeyEnd = Integer.MAX_VALUE;
+              for (V variant : variantsBySampleIndex) {
+                nextKeyEnd = Math.min(variantEncoder.getKeyEnd(variant), nextKeyEnd);
+              }
 
-            List<V> variants = variantEncoder.adjustEnds(variantsBySampleIndex,
-                rowKey.pos, nextKeyEnd);
-
-            output.add(f.call(rowKey, variants));
-          }
-          return output;
+              List<V> variants = variantEncoder.adjustEnds(variantsBySampleIndex,
+                  rowKey.pos, nextKeyEnd);
+              try {
+                return f.call(rowKey, variants);
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              }
+            }
+          };
+          return (Iterable<T>) () -> it;
         });
   }
 
