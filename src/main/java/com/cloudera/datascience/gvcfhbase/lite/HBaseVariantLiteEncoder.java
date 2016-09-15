@@ -1,5 +1,9 @@
-package com.cloudera.datascience.gvcfhbase;
+package com.cloudera.datascience.gvcfhbase.lite;
 
+import com.cloudera.datascience.gvcfhbase.GVCFHBase;
+import com.cloudera.datascience.gvcfhbase.HBaseVariantEncoder;
+import com.cloudera.datascience.gvcfhbase.RowKey;
+import com.cloudera.datascience.gvcfhbase.SampleNameIndex;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;

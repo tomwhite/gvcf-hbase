@@ -1,4 +1,4 @@
-package com.cloudera.datascience.gvcfhbase;
+package com.cloudera.datascience.gvcfhbase.lite;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;

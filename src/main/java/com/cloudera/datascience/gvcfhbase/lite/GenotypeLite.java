@@ -1,4 +1,4 @@
-package com.cloudera.datascience.gvcfhbase;
+package com.cloudera.datascience.gvcfhbase.lite;
 
 import java.io.Serializable;
 
