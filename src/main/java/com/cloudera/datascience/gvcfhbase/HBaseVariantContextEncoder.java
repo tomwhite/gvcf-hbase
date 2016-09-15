@@ -4,6 +4,7 @@ import com.clearspring.analytics.util.Lists;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
@@ -46,31 +47,35 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     int end = variant.getEnd();
     int keyStart = getKeyStart(variant);
     int keyEnd = getKeyEnd(variant);
+    List<Allele> alleles = variant.getAlleles();
+    String ref = alleles.get(0).getDisplayString();
+    String alt = alleles.get(1).getDisplayString();
     byte[] rowKey = toRowKeyBytes(variant.getContig(), keyStart);
     Put put = new Put(rowKey);
     byte[] qualifier = Bytes.toBytes(sampleIndex);
-    String val = keyEnd + "," + start + "," + end + "," + allelesToString(genotype.getAlleles());
+    String val = keyEnd + "," + start + "," + end + "," + ref + "," + alt + "," +
+      allelesToString(genotype.getAlleles(), alleles);
     byte[] value = Bytes.toBytes(val);
     put.addColumn(GVCFHBase.SAMPLE_COLUMN_FAMILY, qualifier, value);
     return put;
   }
 
-  private String allelesToString(List<Allele> alleles) {
+  private String allelesToString(List<Allele> genotypeAlleles, List<Allele> alleles) {
     StringBuilder sb = new StringBuilder();
-    for (Allele allele : alleles) {
-      sb.append(allele.getBaseString()).append(",");
+    for (Allele a : genotypeAlleles) {
+      sb.append(Iterables.indexOf(alleles, a::equals)).append(";");
     }
     sb.deleteCharAt(sb.length() - 1);
     return sb.toString();
   }
 
-  private List<Allele> allelesFromString(String s) {
-    List<String> strings = Lists.newArrayList(Splitter.on(",").split(s));
-    List<Allele> alleles = new ArrayList<>();
-    for (int i = 0; i < strings.size(); i++) {
-      alleles.add(Allele.create(strings.get(i), i == 0));
+  private List<Allele> allelesFromString(String s, List<Allele> alleles) {
+    List<String> strings = Lists.newArrayList(Splitter.on(";").split(s));
+    List<Allele> genotypeAlleles = new ArrayList<>();
+    for (String index : strings) {
+      genotypeAlleles.add(alleles.get(Integer.parseInt(index)));
     }
-    return alleles;
+    return genotypeAlleles;
   }
 
   @Override
@@ -86,8 +91,9 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     int end = Integer.parseInt(splits[2]);
     String ref = splits[3];
     String alt = splits[4];
-    List<Allele> alleles = allelesFromString(splits[5]);
-    Genotype genotype = new GenotypeBuilder(sampleName).alleles(alleles).make();
+    List<Allele> alleles = ImmutableList.of(Allele.create(ref, true), Allele.create(alt));
+    List<Allele> genotypeAlleles = allelesFromString(splits[5], alleles);
+    Genotype genotype = new GenotypeBuilder(sampleName).alleles(genotypeAlleles).make();
     return newVariantContext(rowKey.contig, start, end, ref, alt, rowKey.pos, keyEnd, genotype);
   }
 
@@ -158,8 +164,9 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     List<VariantContext> variants = new ArrayList<>();
     for (VariantContext v : variantsBySampleIndex) {
       if (Iterables.getFirst(v.getAlternateAlleles(), NULL).equals(NON_REF)) {
-        String ref = start == v.getStart() ? v.getReference().getBaseString() : "."; // unknown ref (TODO:use fasta)
-        String alt = Iterables.getOnlyElement(v.getAlternateAlleles()).getBaseString();
+        //String ref = start == v.getStart() ? v.getReference().getDisplayString() : "."; // unknown ref (TODO:use fasta)
+        String ref = v.getReference().getDisplayString();
+        String alt = Iterables.getOnlyElement(v.getAlternateAlleles()).getDisplayString();
         int end = nextKeyEnd < v.getEnd() ? nextKeyEnd : v.getEnd();
         VariantContext variant = newVariantContext(v.getContig(), start, end,
             ref, alt, getKeyStart(v), getKeyEnd(v), v.getGenotype(0));
