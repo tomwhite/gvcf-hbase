@@ -2,8 +2,6 @@ package com.cloudera.datascience.gvcfhbase;
 
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
-import htsjdk.samtools.util.IterableOnceIterator;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
