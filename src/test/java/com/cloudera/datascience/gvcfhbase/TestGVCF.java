@@ -1,8 +1,6 @@
 package com.cloudera.datascience.gvcfhbase;
 
 import com.clearspring.analytics.util.Lists;
-import com.google.common.base.Function;
-import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -11,11 +9,10 @@ import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.GenotypeBuilder;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
+import java.io.IOException;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.TableName;
@@ -25,8 +22,8 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -35,10 +32,21 @@ public class TestGVCF implements Serializable {
 
   private static HBaseTestingUtility testUtil;
 
+  private int splitSize = 4;
+  private TableName tableName = TableName.valueOf("gvcf");
+
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
     testUtil = new HBaseTestingUtility();
     testUtil.startMiniCluster();
+  }
+
+  @Before
+  public void setup() throws IOException {
+    byte[][] columnFamilies = new byte[][]{GVCFHBase.SAMPLE_COLUMN_FAMILY};
+    byte[][] splitKeys = new byte[][] {
+        HBaseVariantEncoder.getSplitKeyBytes("20", splitSize + 1)};
+    HTable table = testUtil.createTable(tableName, columnFamilies, splitKeys);
   }
 
   @AfterClass
@@ -72,62 +80,40 @@ public class TestGVCF implements Serializable {
     return sb.toString();
   }
 
-//
-//  @Test
-//  @Ignore
-//  public void testComplex() throws Exception {
-//    ImmutableList<VariantContext> gvcf1 = ImmutableList.of(
-//        new VariantContext("20", 1, 1, "A", "G", new GenotypeLite("a", "0/1")),
-//        new VariantContext("20", 2, 7, "G", "<NON_REF>", new GenotypeLite("a", "0/0")),
-//        new VariantContext("20", 8, 8, "G", "C", new GenotypeLite("a", "1/1")));
-//
-//    ImmutableList<VariantContext> gvcf2 = ImmutableList.of(
-//        new VariantContext("20", 1, 3, "A", "G", new GenotypeLite("b", "1/1")),
-//        new VariantContext("20", 4, 6, "T", "C", new GenotypeLite("b", "0/0")),
-//        new VariantContext("20", 7, 8, "A", "<NON_REF>", new GenotypeLite("b", "0/0")));
-//
-//    List<String> expectedAllVariants = ImmutableList.of(
-//        "20:1,A:G:0/1(end=1),A:G:1/1(end=3)",
-//        "20:4,G:<NON_REF>:0/0(end=7),T:C:0/0(end=6)",
-//        "20:8,G:C:1/1(end=8),A:<NON_REF>:0/0(end=8)");
-//
-//    check(gvcf1, gvcf2, expectedAllVariants);
-//  }
-//
-//  @Test
-//  public void testMatchingBlocks() throws Exception {
-//    ImmutableList<VariantContext> gvcf1 = ImmutableList.of(
-//        new VariantContext("20", 1, 1, "A", "G", new GenotypeLite("a", "0/1")),
-//        new VariantContext("20", 2, 7, "G", "<NON_REF>", new GenotypeLite("a", "0/0")),
-//        new VariantContext("20", 8, 8, "G", "C", new GenotypeLite("a", "1/1")));
-//
-//    ImmutableList<VariantContext> gvcf2 = ImmutableList.of(
-//        new VariantContext("20", 1, 1, "A", "G", new GenotypeLite("b", "1/1")),
-//        new VariantContext("20", 2, 7, "G", "<NON_REF>", new GenotypeLite("b", "0/0")),
-//        new VariantContext("20", 8, 8, "G", "C", new GenotypeLite("b", "0/1")));
-//
-//    List<String> expectedAllVariants = ImmutableList.of(
-//        "20:1,A:G:0/1(end=1),A:G:1/1(end=1)",
-//        "20:2,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)",
-//        "20:5,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)", // due to split
-//        "20:8,G:C:1/1(end=8),G:C:0/1(end=8)");
-//
-//    check(gvcf1, gvcf2, expectedAllVariants);
-//  }
-//
-//  @Test
-//  public void testSNPAndNonRef() throws Exception {
-//    ImmutableList<VariantContext> gvcf1 = ImmutableList.of(
-//        new VariantContext("20", 1, 1, "A", "G", new GenotypeLite("a", "0/1")));
-//
-//    ImmutableList<VariantContext> gvcf2 = ImmutableList.of(
-//        new VariantContext("20", 1, 1, "A", "<NON_REF>", new GenotypeLite("b", "0/0")));
-//
-//    List<String> expectedAllVariants = ImmutableList.of(
-//        "20:1,A:G:0/1(end=1),A:<NON_REF>:0/0(end=1)");
-//
-//    check(gvcf1, gvcf2, expectedAllVariants);
-//  }
+  @Test
+  public void testMatchingBlocks() throws Exception {
+    ImmutableList<VariantContext> gvcf1 = ImmutableList.of(
+        newVariantContext("20", 1, 1, "A", "G", "a", "0/1"),
+        newVariantContext("20", 2, 7, "G", "<NON_REF>", "a", "0/0"),
+        newVariantContext("20", 8, 8, "G", "C", "a", "1/1"));
+
+    ImmutableList<VariantContext> gvcf2 = ImmutableList.of(
+        newVariantContext("20", 1, 1, "A", "G", "b", "1/1"),
+        newVariantContext("20", 2, 7, "G", "<NON_REF>", "b", "0/0"),
+        newVariantContext("20", 8, 8, "G", "C", "b", "0/1"));
+
+    List<String> expectedAllVariants = ImmutableList.of(
+        "20:1,A:G:0/1(end=1),A:G:1/1(end=1)",
+        "20:2,G:<NON_REF>:0/0(end=4),G:<NON_REF>:0/0(end=4)",
+        "20:5,G:<NON_REF>:0/0(end=7),G:<NON_REF>:0/0(end=7)", // due to split
+        "20:8,G:C:1/1(end=8),G:C:0/1(end=8)");
+
+    check(gvcf1, gvcf2, expectedAllVariants);
+  }
+
+  @Test
+  public void testSNPAndNonRef() throws Exception {
+    ImmutableList<VariantContext> gvcf1 = ImmutableList.of(
+        newVariantContext("20", 1, 1, "A", "G", "a", "0/1"));
+
+    ImmutableList<VariantContext> gvcf2 = ImmutableList.of(
+        newVariantContext("20", 1, 1, "A", "<NON_REF>", "b", "0/0"));
+
+    List<String> expectedAllVariants = ImmutableList.of(
+        "20:1,A:G:0/1(end=1),A:<NON_REF>:0/0(end=1)");
+
+    check(gvcf1, gvcf2, expectedAllVariants);
+  }
 
   @Test
   public void testSNPAndNonRefBlock() throws Exception {
@@ -143,13 +129,6 @@ public class TestGVCF implements Serializable {
         "20:2,G:<NON_REF>:0/0(end=2),A:<NON_REF>:0/0(end=2)"); // A is wrong ref here
 
     check(gvcf1, gvcf2, expectedAllVariants);
-  }
-
-  @Test
-  public void testA() {
-    VariantContext variantContext = newVariantContext("20", 1, 1, "A", "G", "a", "0/1");
-    System.out.println(variantContext);
-    System.out.println(variantContext.getGenotype(0).getGenotypeString());
   }
 
   private static VariantContext newVariantContext(String contig, int start, int end,
@@ -173,13 +152,6 @@ public class TestGVCF implements Serializable {
 
   private void check(List<VariantContext> gvcf1, List<VariantContext> gvcf2,
       List<String> expectedAllVariants) throws Exception {
-    int splitSize = 4;
-
-    TableName tableName = TableName.valueOf("gvcf");
-    byte[][] columnFamilies = new byte[][]{GVCFHBase.SAMPLE_COLUMN_FAMILY};
-    byte[][] splitKeys = new byte[][] {
-        HBaseVariantEncoder.getSplitKeyBytes("20", splitSize + 1)};
-    HTable table = testUtil.createTable(tableName, columnFamilies, splitKeys);
 
     // create an RDD
     SparkConf sparkConf = new SparkConf()
