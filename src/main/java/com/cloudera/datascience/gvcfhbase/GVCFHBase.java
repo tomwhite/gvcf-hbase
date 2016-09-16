@@ -2,8 +2,12 @@ package com.cloudera.datascience.gvcfhbase;
 
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import htsjdk.samtools.util.Interval;
+import htsjdk.samtools.util.Locatable;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.TableName;
@@ -18,14 +22,26 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
-import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.function.VoidFunction;
 import scala.Tuple2;
 
+/**
+ * Provides methods to store gVCF data in HBase, and scan over it.
+ */
 public class GVCFHBase {
 
   public static final byte[] SAMPLE_COLUMN_FAMILY = Bytes.toBytes("s");
 
+  /**
+   * Store variants in an HBase table.
+   * @param rdd the RDD of variants, typically loaded from a gVCF file.
+   * @param variantEncoder the encoder to use to convert variants to bytes
+   * @param tableName the HBase table name, must already exist
+   * @param hbaseContext the HBase context
+   * @param splitSize the size (in genomic locus positions) of HBase table regions;
+   *                  tables must be pre-split
+   * @param <V> the variant type, typically {@link htsjdk.variant.variantcontext.VariantContext}
+   */
   public static <V> void put(JavaRDD<V> rdd, HBaseVariantEncoder<V> variantEncoder,
       TableName tableName, JavaHBaseContext hbaseContext, int splitSize) {
     bulkPut(hbaseContext, rdd, tableName, (FlatMapFunction<V, Put>) v -> {
@@ -48,10 +64,26 @@ public class GVCFHBase {
     });
   }
 
+  /**
+   * Scan over variants in parallel and return an RDD of consolidated variants.
+   * @param variantEncoder the encoder to use to convert variants from bytes
+   * @param tableName the HBase table name
+   * @param hbaseContext the HBase context
+   * @param f the consolidation function. Takes a genomic range (where the start is the
+   *          start position for all the variants returned, and the end is the position
+   *          before the start position of the next row) and a collection of variants;
+   *          the return value is zero or more consolidated values (e.g.
+   *          {@link htsjdk.variant.variantcontext.VariantContext}).
+   *          May be stateful, in order to perform sophisticated merging.
+   * @param <T> the return type; often
+   * {@link htsjdk.variant.variantcontext.VariantContext}, when merging variant calls
+   * @param <V> the variant type, typically {@link htsjdk.variant.variantcontext.VariantContext}
+   * @return
+   */
   @SuppressWarnings("unchecked")
   public static <T, V> JavaRDD<T> scan(HBaseVariantEncoder<V> variantEncoder,
       TableName tableName, JavaHBaseContext
-      hbaseContext, Function2<RowKey, Iterable<V>, T> f) {
+      hbaseContext, FlatMapFunction<Tuple2<Locatable, Iterable<V>>, T> f) {
     Scan scan = new Scan();
     scan.setCaching(100);
     return hbaseContext.hbaseRDD(tableName, scan)
@@ -60,30 +92,38 @@ public class GVCFHBase {
           int numSamples = variantEncoder.getNumSamples();
           final List<V> variantsBySampleIndex = Arrays.asList((V[]) new Object[numSamples]);
           Iterator<T> it = new AbstractIterator<T>() {
+            LinkedList<T> buffer = new LinkedList<T>();
             @Override
             protected T computeNext() {
-              if (!rows.hasNext()) {
-                return endOfData();
-              }
-              Tuple2<ImmutableBytesWritable, Result> row = rows.next();
-              Result result = row._2();
-              RowKey rowKey = RowKey.fromRowKeyBytes(result.getRow());
-              for (Cell cell : result.listCells()) {
-                V variant = variantEncoder.decodeVariant(rowKey, cell);
-                variantsBySampleIndex.set(variantEncoder.getSampleIndex(variant), variant);
-              }
-              // how many positions we can iterate over before the next row
-              int nextKeyEnd = Integer.MAX_VALUE;
-              for (V variant : variantsBySampleIndex) {
-                nextKeyEnd = Math.min(variantEncoder.getKeyEnd(variant), nextKeyEnd);
-              }
+              while (true) {
+                if (!buffer.isEmpty()) {
+                  return buffer.removeFirst();
+                }
+                if (!rows.hasNext()) {
+                  return endOfData();
+                }
+                Tuple2<ImmutableBytesWritable, Result> row = rows.next();
+                Result result = row._2();
+                RowKey rowKey = RowKey.fromRowKeyBytes(result.getRow());
+                for (Cell cell : result.listCells()) {
+                  V variant = variantEncoder.decodeVariant(rowKey, cell);
+                  variantsBySampleIndex.set(variantEncoder.getSampleIndex(variant), variant);
+                }
+                // how many positions we can iterate over before the next row
+                int nextKeyEnd = Integer.MAX_VALUE;
+                for (V variant : variantsBySampleIndex) {
+                  nextKeyEnd = Math.min(variantEncoder.getKeyEnd(variant), nextKeyEnd);
+                }
 
-              List<V> variants = variantEncoder.adjustEnds(variantsBySampleIndex,
-                  rowKey.pos, nextKeyEnd);
-              try {
-                return f.call(rowKey, variants);
-              } catch (Exception e) {
-                throw new RuntimeException(e);
+                try {
+                  Iterable<T> values = f.call(
+                      new Tuple2<>(
+                          new Interval(rowKey.getContig(), rowKey.getStart(), nextKeyEnd),
+                          variantsBySampleIndex));
+                  Iterables.addAll(buffer, values);
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
               }
             }
           };

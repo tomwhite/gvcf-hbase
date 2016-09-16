@@ -3,13 +3,26 @@ package com.cloudera.datascience.gvcfhbase;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hbase.util.Bytes;
 
-public class RowKey {
+/**
+ * The HBase row key, made up of the contig and the start position.
+ */
+class RowKey {
   private static final int CONTIG_LENGTH = 2;
-  public String contig;
-  public int pos;
+
+  private final String contig;
+  private final int start;
+
   public RowKey(String contig, int keyStart) {
     this.contig = contig;
-    this.pos = keyStart;
+    this.start = keyStart;
+  }
+
+  public String getContig() {
+    return contig;
+  }
+
+  public int getStart() {
+    return start;
   }
 
   public static byte[] getSplitKeyBytes(String contig, int keyStart) {

@@ -5,6 +5,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * A global map between sample names and IDs.
+ */
 public class SampleNameIndex implements Serializable {
 
   private List<String> sampleNames;

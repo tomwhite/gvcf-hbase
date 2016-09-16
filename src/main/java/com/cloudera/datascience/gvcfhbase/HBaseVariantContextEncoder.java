@@ -20,8 +20,7 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     implements Serializable {
 
   private static final Allele NON_REF = Allele.create("<NON_REF>", false);
-  private static final Allele NULL = Allele.create("<NULL>", false);
-  
+
   private SampleNameIndex sampleNameIndex;
 
   public HBaseVariantContextEncoder(SampleNameIndex sampleNameIndex) {
@@ -90,7 +89,8 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     List<Allele> alleles = ImmutableList.of(Allele.create(ref, true), Allele.create(alt));
     List<Allele> genotypeAlleles = allelesFromString(splits[5], alleles);
     Genotype genotype = new GenotypeBuilder(sampleName).alleles(genotypeAlleles).make();
-    return newVariantContext(rowKey.contig, start, end, ref, alt, rowKey.pos, keyEnd, genotype);
+    return newVariantContext(rowKey.getContig(), start, end, ref, alt, rowKey.getStart(), keyEnd,
+        genotype);
   }
 
   @Override
@@ -147,25 +147,5 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     builder.attribute("KEY_START", Integer.toString(keyStart));
     builder.attribute("KEY_END", Integer.toString(keyEnd));
     return builder;
-  }
-
-  @Override
-  public List<VariantContext> adjustEnds(List<VariantContext> variantsBySampleIndex,
-      int start, int nextKeyEnd) {
-    List<VariantContext> variants = new ArrayList<>();
-    for (VariantContext v : variantsBySampleIndex) {
-      if (Iterables.getFirst(v.getAlternateAlleles(), NULL).equals(NON_REF)) {
-        //String ref = start == v.getStart() ? v.getReference().getDisplayString() : "."; // unknown ref (TODO:use fasta)
-        String ref = v.getReference().getDisplayString();
-        String alt = Iterables.getOnlyElement(v.getAlternateAlleles()).getDisplayString();
-        int end = nextKeyEnd < v.getEnd() ? nextKeyEnd : v.getEnd();
-        VariantContext variant = newVariantContext(v.getContig(), start, end,
-            ref, alt, getKeyStart(v), getKeyEnd(v), v.getGenotype(0));
-        variants.add(variant);
-      } else {
-        variants.add(v);
-      }
-    }
-    return variants;
   }
 }
