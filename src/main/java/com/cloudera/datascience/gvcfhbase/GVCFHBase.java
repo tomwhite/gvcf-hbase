@@ -66,7 +66,7 @@ public class GVCFHBase {
   }
 
   /**
-   * Load variants in parallel from HBase and return an RDD of consolidated variants.
+   * Load variants in parallel from HBase and return an RDD of combined variants.
    * @param variantEncoder the encoder to use to convert variants from bytes
    * @param tableName the HBase table name
    * @param hbaseContext the HBase context
@@ -74,7 +74,7 @@ public class GVCFHBase {
    * @param <T> the return type; often
    * {@link htsjdk.variant.variantcontext.VariantContext}, when merging variant calls
    * @param <V> the variant type, typically {@link htsjdk.variant.variantcontext.VariantContext}
-   * @return an RDD of consolidated variants
+   * @return an RDD of combined variants
    */
   @SuppressWarnings("unchecked")
   public static <T, V> JavaRDD<T> load(HBaseVariantEncoder<V> variantEncoder,
