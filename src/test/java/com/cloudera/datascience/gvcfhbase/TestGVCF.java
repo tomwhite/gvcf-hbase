@@ -130,7 +130,7 @@ public class TestGVCF implements Serializable {
         "20:5-7,G:<NON_REF>:0/0(2-7),G:<NON_REF>:0/0(2-7)", // due to split
         "20:8-8,G:C:1/1(8-8),G:C:0/1(8-8)");
 
-    List<String> allVariants = scan(gvcf1, gvcf2, TestGVCF::print);
+    List<String> allVariants = storeAndLoad(gvcf1, gvcf2, TestGVCF::print);
     assertEquals(expectedAllVariants, allVariants);
   }
 
@@ -151,7 +151,7 @@ public class TestGVCF implements Serializable {
         newVariantContext("20", 2, 7, "G", "<NON_REF>", "a", "0/0", "b", "0/0"),
         newVariantContext("20", 8, 8, "G", "C", "a", "1/1", "b", "0/1"));
 
-    List<VariantContext> allVariants = scan(gvcf1, gvcf2, TestGVCF::simpleMindedCombine);
+    List<VariantContext> allVariants = storeAndLoad(gvcf1, gvcf2, TestGVCF::simpleMindedCombine);
     // compare string representation
     assertEquals(combinedGvcf.stream().map(Object::toString).collect(Collectors.toList()),
         allVariants.stream().map(Object::toString).collect(Collectors.toList()));
@@ -168,7 +168,7 @@ public class TestGVCF implements Serializable {
     List<String> expectedAllVariants = ImmutableList.of(
         "20:1-1,A:G:0/1(1-1),A:<NON_REF>:0/0(1-1)");
 
-    List<String> allVariants = scan(gvcf1, gvcf2, TestGVCF::print);
+    List<String> allVariants = storeAndLoad(gvcf1, gvcf2, TestGVCF::print);
     assertEquals(expectedAllVariants, allVariants);
 
   }
@@ -186,7 +186,7 @@ public class TestGVCF implements Serializable {
         "20:1-1,A:G:0/1(1-1),A:<NON_REF>:0/0(1-2)",
         "20:2-2,G:<NON_REF>:0/0(2-2),A:<NON_REF>:0/0(1-2)");
 
-    List<String> allVariants = scan(gvcf1, gvcf2, TestGVCF::print);
+    List<String> allVariants = storeAndLoad(gvcf1, gvcf2, TestGVCF::print);
     assertEquals(expectedAllVariants, allVariants);
 
   }
@@ -227,7 +227,7 @@ public class TestGVCF implements Serializable {
     return new GenotypeBuilder(sampleName, genotypeAlleles).make();
   }
 
-  private <T> List<T> scan(List<VariantContext> gvcf1, List<VariantContext> gvcf2,
+  private <T> List<T> storeAndLoad(List<VariantContext> gvcf1, List<VariantContext> gvcf2,
       FlatMapFunction<Tuple2<Locatable, Iterable<VariantContext>>, T> f) throws Exception {
 
     // create an RDD
@@ -240,7 +240,7 @@ public class TestGVCF implements Serializable {
     JavaRDD<VariantContext> rdd1 = jsc.parallelize(gvcf1);
     JavaRDD<VariantContext> rdd2 = jsc.parallelize(gvcf2);
 
-    // insert into HBase
+    // store in HBase
     Configuration conf = testUtil.getConfiguration();
     JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, conf);
 
@@ -249,11 +249,11 @@ public class TestGVCF implements Serializable {
     VCFHeader vcfHeader = new VCFHeader(Sets.newHashSet(), sampleNames);
     HBaseVariantEncoder<VariantContext> variantEncoder =
         new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader);
-    GVCFHBase.put(rdd1, variantEncoder, tableName, hbaseContext, splitSize);
-    GVCFHBase.put(rdd2, variantEncoder, tableName, hbaseContext, splitSize);
+    GVCFHBase.store(rdd1, variantEncoder, tableName, hbaseContext, splitSize);
+    GVCFHBase.store(rdd2, variantEncoder, tableName, hbaseContext, splitSize);
 
-    // Scan over variants
-    List<T> allVariants = GVCFHBase.scan(variantEncoder, tableName, hbaseContext, f)
+    // load from HBase
+    List<T> allVariants = GVCFHBase.load(variantEncoder, tableName, hbaseContext, f)
         .collect();
     //allVariants.forEach(System.out::println);
 

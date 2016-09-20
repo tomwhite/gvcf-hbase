@@ -5,8 +5,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
-import htsjdk.variant.variantcontext.VariantContextBuilder;
-import htsjdk.variant.vcf.VCFHeader;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -45,7 +43,7 @@ public class GVCFHBase {
    *                  tables must be pre-split
    * @param <V> the variant type, typically {@link htsjdk.variant.variantcontext.VariantContext}
    */
-  public static <V> void put(JavaRDD<V> rdd, HBaseVariantEncoder<V> variantEncoder,
+  public static <V> void store(JavaRDD<V> rdd, HBaseVariantEncoder<V> variantEncoder,
       TableName tableName, JavaHBaseContext hbaseContext, int splitSize) {
     bulkPut(hbaseContext, rdd, tableName, (FlatMapFunction<V, Put>) v -> {
       List<Put> puts = null;
@@ -68,7 +66,7 @@ public class GVCFHBase {
   }
 
   /**
-   * Scan over variants in parallel and return an RDD of consolidated variants.
+   * Load variants in parallel from HBase and return an RDD of consolidated variants.
    * @param variantEncoder the encoder to use to convert variants from bytes
    * @param tableName the HBase table name
    * @param hbaseContext the HBase context
@@ -84,7 +82,7 @@ public class GVCFHBase {
    * @return
    */
   @SuppressWarnings("unchecked")
-  public static <T, V> JavaRDD<T> scan(HBaseVariantEncoder<V> variantEncoder,
+  public static <T, V> JavaRDD<T> load(HBaseVariantEncoder<V> variantEncoder,
       TableName tableName, JavaHBaseContext
       hbaseContext, FlatMapFunction<Tuple2<Locatable, Iterable<V>>, T> f) {
     Scan scan = new Scan();
@@ -135,7 +133,7 @@ public class GVCFHBase {
   }
 
   @SuppressWarnings("unchecked")
-  public static <T, V> JavaRDD<V> scanSingle(HBaseVariantEncoder<V> variantEncoder,
+  public static <V> JavaRDD<V> loadSingleSample(HBaseVariantEncoder<V> variantEncoder,
       TableName tableName, JavaHBaseContext hbaseContext, String sampleName,
       SampleNameIndex sampleNameIndex) {
     Scan scan = new Scan();

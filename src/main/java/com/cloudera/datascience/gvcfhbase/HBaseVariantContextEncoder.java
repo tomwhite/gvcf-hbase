@@ -87,6 +87,7 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     headerDataCache.setHeader(perSampleHaders.get(sampleName));
     ((LazyVCFGenotypesContext) genotypes).getParser().setHeaderDataCache(headerDataCache);
     builder.genotypes(genotypes);
+
     return builder.make();
   }
 

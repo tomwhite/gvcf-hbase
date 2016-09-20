@@ -67,7 +67,7 @@ public class TestGVCFRoundTrip implements Serializable {
 
     JavaRDD<VariantContext> rdd = jsc.parallelize(expectedVariants);
 
-    // insert into HBase
+    // store in HBase
     Configuration conf = testUtil.getConfiguration();
     JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, conf);
     SampleNameIndex sampleNameIndex = new SampleNameIndex(
@@ -75,14 +75,18 @@ public class TestGVCFRoundTrip implements Serializable {
     );
     HBaseVariantEncoder<VariantContext> variantEncoder =
         new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader);
-    GVCFHBase.put(rdd, variantEncoder, tableName, hbaseContext, splitSize);
+    GVCFHBase.store(rdd, variantEncoder, tableName, hbaseContext, splitSize);
 
-    // scan
-    List<VariantContext> actualVariants = GVCFHBase.scanSingle(variantEncoder, tableName,
+    // load from HBase
+    List<VariantContext> actualVariants = GVCFHBase.loadSingleSample(variantEncoder, tableName,
         hbaseContext, "NA12878", sampleNameIndex)
         .collect();
 
     assertEqualVariants(expectedVariants, actualVariants);
+
+    jsc.stop();
+
+    testUtil.deleteTable(tableName);
   }
 
   /**
