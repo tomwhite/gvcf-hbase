@@ -102,7 +102,7 @@ public class GVCFHBase {
                   if (!buffer.isEmpty()) {
                     return buffer.removeFirst();
                   }
-                  if (!rows.hasNext()) {
+                  if (!rows.hasNext()) { // TODO: need to check if f has more values
                     return endOfData();
                   }
                   Tuple2<ImmutableBytesWritable, Result> row = rows.next();
