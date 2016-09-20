@@ -1,11 +1,8 @@
 package com.cloudera.datascience.gvcfhbase;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
-import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.VariantContext;
-import htsjdk.variant.variantcontext.VariantContextComparator;
 import htsjdk.variant.vcf.VCFFileReader;
 import htsjdk.variant.vcf.VCFHeader;
 import java.io.File;
@@ -21,12 +18,10 @@ import org.apache.hadoop.hbase.spark.JavaHBaseContext;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.FlatMapFunction;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import scala.Tuple2;
 
 import static org.junit.Assert.assertEquals;
 
