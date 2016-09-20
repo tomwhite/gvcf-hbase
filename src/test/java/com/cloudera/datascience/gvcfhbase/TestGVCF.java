@@ -4,6 +4,7 @@ import com.clearspring.analytics.util.Lists;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.Allele;
@@ -11,9 +12,12 @@ import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.GenotypeBuilder;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
+import htsjdk.variant.vcf.VCFFileReader;
 import htsjdk.variant.vcf.VCFHeader;
+import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
@@ -154,9 +158,7 @@ public class TestGVCF implements Serializable {
         newVariantContext("20", 8, 8, "G", "C", "a", "1/1", "b", "0/1"));
 
     List<VariantContext> allVariants = storeAndLoad(gvcf1, gvcf2, TestGVCF::simpleMindedCombine);
-    // compare string representation
-    assertEquals(combinedGvcf.stream().map(Object::toString).collect(Collectors.toList()),
-        allVariants.stream().map(Object::toString).collect(Collectors.toList()));
+    assertEqualVariants(combinedGvcf, allVariants);
   }
 
   @Test
@@ -191,6 +193,54 @@ public class TestGVCF implements Serializable {
     List<String> allVariants = storeAndLoad(gvcf1, gvcf2, TestGVCF::print);
     assertEquals(expectedAllVariants, allVariants);
 
+  }
+
+  @Test
+  public void testRoundTrip() throws Exception {
+    List<VariantContext> expectedVariants = new ArrayList<>();
+    VCFFileReader vcfFileReader = new VCFFileReader(new File("src/test/resources/g.vcf"), false);
+    Iterators.addAll(expectedVariants, vcfFileReader.iterator());
+    VCFHeader vcfHeader = vcfFileReader.getFileHeader();
+
+    // create an RDD
+    SparkConf sparkConf = new SparkConf()
+        .setMaster("local")
+        .setAppName(getClass().getSimpleName() + tableName)
+        .set("spark.io.compression.codec", "lzf");
+    JavaSparkContext jsc = new JavaSparkContext(sparkConf);
+
+    JavaRDD<VariantContext> rdd = jsc.parallelize(expectedVariants);
+    ImmutableList<VariantContext> gvcf2 = ImmutableList.of(
+        newVariantContext("20", 1, 1, "A", "G", "b", "1/1"),
+        newVariantContext("20", 2, 7, "G", "<NON_REF>", "b", "0/0"),
+        newVariantContext("20", 8, 8, "G", "C", "b", "0/1"));
+    JavaRDD<VariantContext> rdd2 = jsc.parallelize(gvcf2);
+
+    // store in HBase
+    Configuration conf = testUtil.getConfiguration();
+    JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, conf);
+    SampleNameIndex sampleNameIndex = new SampleNameIndex(
+        com.google.common.collect.Lists.newArrayList("NA12878", "b")
+    );
+    HBaseVariantEncoder<VariantContext> variantEncoder =
+        new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader);
+    GVCFHBase.store(rdd, variantEncoder, tableName, hbaseContext, splitSize);
+    GVCFHBase.store(rdd2, variantEncoder, tableName, hbaseContext, splitSize);
+
+    // load from HBase
+    List<VariantContext> actualVariants = GVCFHBase.loadSingleSample(variantEncoder, tableName,
+        hbaseContext, "NA12878", sampleNameIndex)
+        .collect();
+    assertEqualVariants(expectedVariants, actualVariants);
+
+    List<VariantContext> actualVariants2 = GVCFHBase.loadSingleSample(variantEncoder, tableName,
+        hbaseContext, "b", sampleNameIndex)
+        .collect();
+    assertEqualVariants(gvcf2, actualVariants2);
+
+    jsc.stop();
+
+    testUtil.deleteTable(tableName);
   }
 
   private static VariantContext newVariantContext(String contig, int start, int end,
@@ -264,6 +314,19 @@ public class TestGVCF implements Serializable {
     jsc.stop();
 
     return allVariants;
+  }
+
+  /**
+   * Validates that the given lists have variant
+   * context that correspond to the same variants in the same order.
+   * Compares VariantContext by comparing toStringDecodeGenotypes
+   */
+  public static void assertEqualVariants(final List<VariantContext> v1, final List<VariantContext> v2) {
+    assertEquals(v1.size(), v2.size());
+    for (int i = 0; i < v1.size(); i++) {
+      assertEquals (v1.get(i).toStringDecodeGenotypes().replaceFirst("\\[VC [^ ]+", "[VC "),
+          v2.get(i).toStringDecodeGenotypes().replaceFirst("\\[VC [^ ]+", "[VC "));
+    }
   }
 
 }

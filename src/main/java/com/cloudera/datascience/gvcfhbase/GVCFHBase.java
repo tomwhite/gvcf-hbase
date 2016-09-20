@@ -132,6 +132,17 @@ public class GVCFHBase {
         });
   }
 
+  /**
+   * Load variants in parallel from HBase for a single sample.
+   * @param variantEncoder the encoder to use to convert variants from bytes
+   * @param tableName the HBase table name
+   * @param hbaseContext the HBase context
+   * @param sampleName the sample name to return all variants for
+   * @param sampleNameIndex the global sample name index
+   * {@link htsjdk.variant.variantcontext.VariantContext}, when merging variant calls
+   * @param <V> the variant type, typically {@link htsjdk.variant.variantcontext.VariantContext}
+   * @return
+   */
   @SuppressWarnings("unchecked")
   public static <V> JavaRDD<V> loadSingleSample(HBaseVariantEncoder<V> variantEncoder,
       TableName tableName, JavaHBaseContext hbaseContext, String sampleName,
@@ -153,7 +164,6 @@ public class GVCFHBase {
                 Tuple2<ImmutableBytesWritable, Result> row = rows.next();
                 Result result = row._2();
                 RowKey rowKey = RowKey.fromRowKeyBytes(result.getRow());
-                // TODO: check this is how scanning works
                 try {
                   V variant = variantEncoder.decodeVariant(rowKey, Iterables
                       .getOnlyElement(result.listCells()), false);
