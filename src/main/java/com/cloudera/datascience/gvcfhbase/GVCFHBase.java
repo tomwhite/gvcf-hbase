@@ -4,7 +4,6 @@ import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import htsjdk.samtools.util.Interval;
-import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -71,12 +70,7 @@ public class GVCFHBase {
    * @param variantEncoder the encoder to use to convert variants from bytes
    * @param tableName the HBase table name
    * @param hbaseContext the HBase context
-   * @param f the consolidation function. Takes a genomic range (where the start is the
-   *          start position for all the variants returned, and the end is the position
-   *          before the start position of the next row) and a collection of variants;
-   *          the return value is zero or more consolidated values (e.g.
-   *          {@link htsjdk.variant.variantcontext.VariantContext}).
-   *          May be stateful, in order to perform sophisticated merging.
+   * @param variantCombiner the variant combiner to merge variants together
    * @param <T> the return type; often
    * {@link htsjdk.variant.variantcontext.VariantContext}, when merging variant calls
    * @param <V> the variant type, typically {@link htsjdk.variant.variantcontext.VariantContext}
@@ -85,7 +79,7 @@ public class GVCFHBase {
   @SuppressWarnings("unchecked")
   public static <T, V> JavaRDD<T> load(HBaseVariantEncoder<V> variantEncoder,
       TableName tableName, JavaHBaseContext
-      hbaseContext, FlatMapFunction<Tuple2<Locatable, Iterable<V>>, T> f) {
+      hbaseContext, VariantCombiner<V, T> variantCombiner) {
     Scan scan = new Scan();
     scan.setCaching(100);
     return hbaseContext.hbaseRDD(tableName, scan)
@@ -102,7 +96,12 @@ public class GVCFHBase {
                   if (!buffer.isEmpty()) {
                     return buffer.removeFirst();
                   }
-                  if (!rows.hasNext()) { // TODO: need to check if f has more values
+                  if (!rows.hasNext()) {
+                    Iterable<T> values = variantCombiner.finish();
+                    Iterables.addAll(buffer, values);
+                    if (!buffer.isEmpty()) {
+                      continue;
+                    }
                     return endOfData();
                   }
                   Tuple2<ImmutableBytesWritable, Result> row = rows.next();
@@ -118,10 +117,9 @@ public class GVCFHBase {
                     nextKeyEnd = Math.min(variantEncoder.getKeyEnd(variant), nextKeyEnd);
                   }
 
-                  Iterable<T> values = f.call(
-                      new Tuple2<>(
+                  Iterable<T> values = variantCombiner.combine(
                           new Interval(rowKey.getContig(), rowKey.getStart(), nextKeyEnd),
-                          variantsBySampleIndex));
+                          variantsBySampleIndex);
                   Iterables.addAll(buffer, values);
                 } catch (Exception e) {
                   throw new RuntimeException(e);

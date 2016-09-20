@@ -28,12 +28,10 @@ import org.apache.hadoop.hbase.spark.JavaHBaseContext;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.FlatMapFunction;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import scala.Tuple2;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -64,47 +62,60 @@ public class TestGVCF implements Serializable {
     testUtil.shutdownMiniCluster();
   }
 
-  private static Iterable<String> print(Tuple2<Locatable, Iterable<VariantContext>> variantsLoc) {
-    Locatable loc = variantsLoc._1();
-    Iterable<VariantContext> variants = variantsLoc._2();
-    StringBuilder sb = new StringBuilder();
-    sb.append(loc.getContig()).append(":").append(loc.getStart()).append("-")
-        .append(loc.getEnd()).append(",");
-    for (VariantContext variant : variants) {
-      List<Allele> alleles = variant.getAlleles();
-      Genotype genotype = variant.getGenotype(0);
-      sb.append(alleles.get(0).getDisplayString()).append(":");
-      sb.append(alleles.get(1).getDisplayString()).append(":");
-      sb.append(genotypeToString(genotype, alleles));
-      sb.append("(").append(variant.getStart()).append("-")
-          .append(variant.getEnd()).append(")");
-      sb.append(",");
+  private static class PrintVariantCombiner implements VariantCombiner<VariantContext, String> {
+    @Override
+    public Iterable<String> combine(Locatable loc, Iterable<VariantContext>
+        variants) {
+      StringBuilder sb = new StringBuilder();
+      sb.append(loc.getContig()).append(":").append(loc.getStart()).append("-")
+          .append(loc.getEnd()).append(",");
+      for (VariantContext variant : variants) {
+        List<Allele> alleles = variant.getAlleles();
+        Genotype genotype = variant.getGenotype(0);
+        sb.append(alleles.get(0).getDisplayString()).append(":");
+        sb.append(alleles.get(1).getDisplayString()).append(":");
+        sb.append(genotypeToString(genotype, alleles));
+        sb.append("(").append(variant.getStart()).append("-")
+            .append(variant.getEnd()).append(")");
+        sb.append(",");
+      }
+      sb.deleteCharAt(sb.length() - 1);
+      return ImmutableList.of(sb.toString());
     }
-    sb.deleteCharAt(sb.length() - 1);
-    return ImmutableList.of(sb.toString());
-  }
 
-  private static Iterable<VariantContext> simpleMindedCombine(Tuple2<Locatable,
-      Iterable<VariantContext>> variantsLoc) {
-    // assume that variants are the same type, so just combine genotypes
-    Locatable loc = variantsLoc._1();
-    List<VariantContext> variants = Lists.newArrayList(variantsLoc._2());
-    VariantContext firstVariant = variants.get(0);
-    if (firstVariant.getStart() != loc.getStart()) { // ignore fake variant from split
+    @Override
+    public Iterable<String> finish() {
       return ImmutableList.of();
     }
-    VariantContextBuilder builder = new VariantContextBuilder();
-    builder.source(TestGVCF.class.getSimpleName());
-    builder.chr(firstVariant.getContig());
-    builder.start(firstVariant.getStart());
-    builder.stop(firstVariant.getEnd());
-    builder.alleles(firstVariant.getAlleles());
-    List<Genotype> genotypes = Lists.newArrayList(firstVariant.getGenotypes());
-    for (int i = 1; i < variants.size(); i++) {
-      genotypes.addAll(variants.get(i).getGenotypes());
+  }
+
+  private static class SimpleMindedVariantCombiner implements VariantCombiner<VariantContext,
+      VariantContext> {
+    @Override
+    public Iterable<VariantContext> combine(Locatable loc, Iterable<VariantContext> v) {
+      List<VariantContext> variants = Lists.newArrayList(v);
+      VariantContext firstVariant = variants.get(0);
+      if (firstVariant.getStart() != loc.getStart()) { // ignore fake variant from split
+        return ImmutableList.of();
+      }
+      VariantContextBuilder builder = new VariantContextBuilder();
+      builder.source(TestGVCF.class.getSimpleName());
+      builder.chr(firstVariant.getContig());
+      builder.start(firstVariant.getStart());
+      builder.stop(firstVariant.getEnd());
+      builder.alleles(firstVariant.getAlleles());
+      List<Genotype> genotypes = Lists.newArrayList(firstVariant.getGenotypes());
+      for (int i = 1; i < variants.size(); i++) {
+        genotypes.addAll(variants.get(i).getGenotypes());
+      }
+      builder.genotypes(genotypes);
+      return ImmutableList.of(builder.make());
     }
-    builder.genotypes(genotypes);
-    return ImmutableList.of(builder.make());
+
+    @Override
+    public Iterable<VariantContext> finish() {
+      return ImmutableList.of();
+    }
   }
 
   private static String genotypeToString(Genotype genotype, List<Allele> alleles) {
@@ -136,7 +147,7 @@ public class TestGVCF implements Serializable {
         "20:5-7,G:<NON_REF>:0/0(2-7),G:<NON_REF>:0/0(2-7)", // due to split
         "20:8-8,G:C:1/1(8-8),G:C:0/1(8-8)");
 
-    List<String> allVariants = storeAndLoad(gvcf1, gvcf2, TestGVCF::print);
+    List<String> allVariants = storeAndLoad(gvcf1, gvcf2, new PrintVariantCombiner());
     assertEquals(expectedAllVariants, allVariants);
   }
 
@@ -157,7 +168,7 @@ public class TestGVCF implements Serializable {
         newVariantContext("20", 2, 7, "G", "<NON_REF>", "a", "0/0", "b", "0/0"),
         newVariantContext("20", 8, 8, "G", "C", "a", "1/1", "b", "0/1"));
 
-    List<VariantContext> allVariants = storeAndLoad(gvcf1, gvcf2, TestGVCF::simpleMindedCombine);
+    List<VariantContext> allVariants = storeAndLoad(gvcf1, gvcf2, new SimpleMindedVariantCombiner());
     assertEqualVariants(combinedGvcf, allVariants);
   }
 
@@ -172,7 +183,7 @@ public class TestGVCF implements Serializable {
     List<String> expectedAllVariants = ImmutableList.of(
         "20:1-1,A:G:0/1(1-1),A:<NON_REF>:0/0(1-1)");
 
-    List<String> allVariants = storeAndLoad(gvcf1, gvcf2, TestGVCF::print);
+    List<String> allVariants = storeAndLoad(gvcf1, gvcf2, new PrintVariantCombiner());
     assertEquals(expectedAllVariants, allVariants);
 
   }
@@ -190,7 +201,7 @@ public class TestGVCF implements Serializable {
         "20:1-1,A:G:0/1(1-1),A:<NON_REF>:0/0(1-2)",
         "20:2-2,G:<NON_REF>:0/0(2-2),A:<NON_REF>:0/0(1-2)");
 
-    List<String> allVariants = storeAndLoad(gvcf1, gvcf2, TestGVCF::print);
+    List<String> allVariants = storeAndLoad(gvcf1, gvcf2, new PrintVariantCombiner());
     assertEquals(expectedAllVariants, allVariants);
 
   }
@@ -280,7 +291,7 @@ public class TestGVCF implements Serializable {
   }
 
   private <T> List<T> storeAndLoad(List<VariantContext> gvcf1, List<VariantContext> gvcf2,
-      FlatMapFunction<Tuple2<Locatable, Iterable<VariantContext>>, T> f) throws Exception {
+      VariantCombiner<VariantContext, T> variantCombiner) throws Exception {
 
     // create an RDD
     SparkConf sparkConf = new SparkConf()
@@ -305,7 +316,7 @@ public class TestGVCF implements Serializable {
     GVCFHBase.store(rdd2, variantEncoder, tableName, hbaseContext, splitSize);
 
     // load from HBase
-    List<T> allVariants = GVCFHBase.load(variantEncoder, tableName, hbaseContext, f)
+    List<T> allVariants = GVCFHBase.load(variantEncoder, tableName, hbaseContext, variantCombiner)
         .collect();
     //allVariants.forEach(System.out::println);
 
