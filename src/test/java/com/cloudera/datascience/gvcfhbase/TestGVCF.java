@@ -32,6 +32,7 @@ import org.junit.Test;
 import scala.Tuple2;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
 public class TestGVCF implements Serializable {
 
@@ -106,6 +107,7 @@ public class TestGVCF implements Serializable {
     StringBuilder sb = new StringBuilder();
     for (Allele a : genotype.getAlleles()) {
       int index = Iterables.indexOf(alleles, a::equals);
+      assertNotEquals(-1, index);
       sb.append(index).append(genotype.isPhased() ? "|" : "/");
     }
     sb.deleteCharAt(sb.length() - 1);
