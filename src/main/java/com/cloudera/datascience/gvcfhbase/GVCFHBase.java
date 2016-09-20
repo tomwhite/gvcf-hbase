@@ -5,6 +5,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
+import htsjdk.variant.variantcontext.VariantContextBuilder;
+import htsjdk.variant.vcf.VCFHeader;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -96,26 +99,26 @@ public class GVCFHBase {
             @Override
             protected T computeNext() {
               while (true) {
-                if (!buffer.isEmpty()) {
-                  return buffer.removeFirst();
-                }
-                if (!rows.hasNext()) {
-                  return endOfData();
-                }
-                Tuple2<ImmutableBytesWritable, Result> row = rows.next();
-                Result result = row._2();
-                RowKey rowKey = RowKey.fromRowKeyBytes(result.getRow());
-                for (Cell cell : result.listCells()) {
-                  V variant = variantEncoder.decodeVariant(rowKey, cell);
-                  variantsBySampleIndex.set(variantEncoder.getSampleIndex(variant), variant);
-                }
-                // how many positions we can iterate over before the next row
-                int nextKeyEnd = Integer.MAX_VALUE;
-                for (V variant : variantsBySampleIndex) {
-                  nextKeyEnd = Math.min(variantEncoder.getKeyEnd(variant), nextKeyEnd);
-                }
-
                 try {
+                  if (!buffer.isEmpty()) {
+                    return buffer.removeFirst();
+                  }
+                  if (!rows.hasNext()) {
+                    return endOfData();
+                  }
+                  Tuple2<ImmutableBytesWritable, Result> row = rows.next();
+                  Result result = row._2();
+                  RowKey rowKey = RowKey.fromRowKeyBytes(result.getRow());
+                  for (Cell cell : result.listCells()) {
+                    V variant = variantEncoder.decodeVariant(rowKey, cell, true);
+                    variantsBySampleIndex.set(variantEncoder.getSampleIndex(variant), variant);
+                  }
+                  // how many positions we can iterate over before the next row
+                  int nextKeyEnd = Integer.MAX_VALUE;
+                  for (V variant : variantsBySampleIndex) {
+                    nextKeyEnd = Math.min(variantEncoder.getKeyEnd(variant), nextKeyEnd);
+                  }
+
                   Iterable<T> values = f.call(
                       new Tuple2<>(
                           new Interval(rowKey.getContig(), rowKey.getStart(), nextKeyEnd),
@@ -128,6 +131,46 @@ public class GVCFHBase {
             }
           };
           return (Iterable<T>) () -> it;
+        });
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <T, V> JavaRDD<V> scanSingle(HBaseVariantEncoder<V> variantEncoder,
+      TableName tableName, JavaHBaseContext hbaseContext, String sampleName,
+      SampleNameIndex sampleNameIndex) {
+    Scan scan = new Scan();
+    byte[] qualifier = Bytes.toBytes(sampleNameIndex.getSampleIndex(sampleName));
+    scan.addColumn(SAMPLE_COLUMN_FAMILY, qualifier);
+    scan.setCaching(100);
+    return hbaseContext.hbaseRDD(tableName, scan)
+        .mapPartitions((FlatMapFunction<Iterator<Tuple2<ImmutableBytesWritable,
+            Result>>, V>) rows -> {
+          Iterator<V> it = new AbstractIterator<V>() {
+            @Override
+            protected V computeNext() {
+              while (true) {
+                if (!rows.hasNext()) {
+                  return endOfData();
+                }
+                Tuple2<ImmutableBytesWritable, Result> row = rows.next();
+                Result result = row._2();
+                RowKey rowKey = RowKey.fromRowKeyBytes(result.getRow());
+                // TODO: check this is how scanning works
+                try {
+                  V variant = variantEncoder.decodeVariant(rowKey, Iterables
+                      .getOnlyElement(result.listCells()), false);
+                  if (variantEncoder.getStart(variant) != rowKey.getStart()) { // ignore
+                    // fake variant from split
+                    continue;
+                  }
+                  return variant;
+                } catch (IOException e) {
+                  throw new RuntimeException(e);
+                }
+              }
+            }
+          };
+          return (Iterable<V>) () -> it;
         });
   }
 

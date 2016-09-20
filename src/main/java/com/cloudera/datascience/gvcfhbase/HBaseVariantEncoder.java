@@ -1,5 +1,6 @@
 package com.cloudera.datascience.gvcfhbase;
 
+import java.io.IOException;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
 
@@ -10,8 +11,8 @@ import org.apache.hadoop.hbase.client.Put;
  */
 public abstract class HBaseVariantEncoder<V> {
   public abstract int getNumSamples();
-  public abstract Put encodeVariant(V variant);
-  public abstract V decodeVariant(RowKey rowKey, Cell cell);
+  public abstract Put encodeVariant(V variant) throws IOException;
+  public abstract V decodeVariant(RowKey rowKey, Cell cell, boolean includeKeyAttributes) throws IOException;
   public abstract int getSampleIndex(V variant);
   public abstract int getStart(V variant);
   public abstract int getEnd(V variant);

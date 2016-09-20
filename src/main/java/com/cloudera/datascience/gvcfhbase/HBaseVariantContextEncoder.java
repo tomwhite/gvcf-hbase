@@ -1,31 +1,43 @@
 package com.cloudera.datascience.gvcfhbase;
 
-import com.clearspring.analytics.util.Lists;
-import com.google.common.base.Splitter;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
-import htsjdk.variant.variantcontext.GenotypeBuilder;
+import htsjdk.variant.variantcontext.GenotypesContext;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
+import htsjdk.variant.vcf.VCFHeader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.seqdoop.hadoop_bam.LazyVCFGenotypesContext;
+import org.seqdoop.hadoop_bam.VariantContextCodec;
+import org.seqdoop.hadoop_bam.VariantContextWithHeader;
 
 public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantContext>
     implements Serializable {
 
-  private static final Allele NON_REF = Allele.create("<NON_REF>", false);
+  public static final String KEY_START = "KEY_START";
+  public static final String KEY_END = "KEY_END";
 
-  private SampleNameIndex sampleNameIndex;
+  private final SampleNameIndex sampleNameIndex;
+  private final VCFHeader vcfHeader;
 
   public HBaseVariantContextEncoder(SampleNameIndex sampleNameIndex) {
-    this.sampleNameIndex = sampleNameIndex;
+    this(sampleNameIndex, null);
   }
+
+  public HBaseVariantContextEncoder(SampleNameIndex sampleNameIndex, VCFHeader vcfHeader) {
+    this.sampleNameIndex = sampleNameIndex;
+    this.vcfHeader = vcfHeader;
+  }
+
 
   @Override
   public int getNumSamples() {
@@ -33,64 +45,42 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
   }
 
   @Override
-  public Put encodeVariant(VariantContext variant) {
+  public Put encodeVariant(VariantContext variant) throws IOException {
     // note that we only store one genotype here as we expect to load single sample
     // gvcf files
+    Preconditions.checkArgument(variant.getNSamples() == 1);
     Genotype genotype = variant.getGenotype(0);
     int sampleIndex = sampleNameIndex.getSampleIndex(genotype.getSampleName());
-    int start = variant.getStart();
-    int end = variant.getEnd();
     int keyStart = getKeyStart(variant);
-    int keyEnd = getKeyEnd(variant);
-    List<Allele> alleles = variant.getAlleles();
-    String ref = alleles.get(0).getDisplayString();
-    String alt = alleles.get(1).getDisplayString();
     byte[] rowKey = RowKey.toRowKeyBytes(variant.getContig(), keyStart);
     Put put = new Put(rowKey);
     byte[] qualifier = Bytes.toBytes(sampleIndex);
-    String val = keyEnd + "," + start + "," + end + "," + ref + "," + alt + "," +
-      allelesToString(genotype.getAlleles(), alleles);
-    byte[] value = Bytes.toBytes(val);
-    put.addColumn(GVCFHBase.SAMPLE_COLUMN_FAMILY, qualifier, value);
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    DataOutputStream out = new DataOutputStream(baos);
+    VariantContextCodec.write(out, new VariantContextWithHeader(variant, vcfHeader));
+    put.addColumn(GVCFHBase.SAMPLE_COLUMN_FAMILY, qualifier, baos.toByteArray());
     return put;
   }
 
-  private String allelesToString(List<Allele> genotypeAlleles, List<Allele> alleles) {
-    StringBuilder sb = new StringBuilder();
-    for (Allele a : genotypeAlleles) {
-      sb.append(Iterables.indexOf(alleles, a::equals)).append(";");
-    }
-    sb.deleteCharAt(sb.length() - 1);
-    return sb.toString();
-  }
-
-  private List<Allele> allelesFromString(String s, List<Allele> alleles) {
-    List<String> strings = Lists.newArrayList(Splitter.on(";").split(s));
-    List<Allele> genotypeAlleles = new ArrayList<>();
-    for (String index : strings) {
-      genotypeAlleles.add(alleles.get(Integer.parseInt(index)));
-    }
-    return genotypeAlleles;
-  }
-
   @Override
-  public VariantContext decodeVariant(RowKey rowKey, Cell cell) {
-    int sampleIndex = Bytes.toInt(cell.getQualifierArray(),
-        cell.getQualifierOffset(), cell.getQualifierLength());
-    String sampleName = sampleNameIndex.getSampleName(sampleIndex);
-    String val = Bytes.toString(cell.getValueArray(), cell.getValueOffset(),
+  public VariantContext decodeVariant(RowKey rowKey, Cell cell, boolean
+      includeKeyAttributes) throws IOException {
+    ByteArrayInputStream bais = new ByteArrayInputStream(cell
+        .getValueArray(), cell.getValueOffset(),
         cell.getValueLength());
-    String[] splits = val.split(",");
-    int keyEnd = Integer.parseInt(splits[0]);
-    int start = Integer.parseInt(splits[1]);
-    int end = Integer.parseInt(splits[2]);
-    String ref = splits[3];
-    String alt = splits[4];
-    List<Allele> alleles = ImmutableList.of(Allele.create(ref, true), Allele.create(alt));
-    List<Allele> genotypeAlleles = allelesFromString(splits[5], alleles);
-    Genotype genotype = new GenotypeBuilder(sampleName).alleles(genotypeAlleles).make();
-    return newVariantContext(rowKey.getContig(), start, end, ref, alt, rowKey.getStart(), keyEnd,
-        genotype);
+    DataInputStream in = new DataInputStream(bais);
+    VariantContext variant = VariantContextCodec.read(in);
+    // reify genotypes by building a new object that doesn't have lazy genotypes
+    VariantContextBuilder builder = new VariantContextBuilder(variant);
+    if (!includeKeyAttributes) {
+      builder.rmAttributes(ImmutableList.of(KEY_START, KEY_END));
+    }
+    GenotypesContext genotypes = variant.getGenotypes();
+    LazyVCFGenotypesContext.HeaderDataCache headerDataCache = new LazyVCFGenotypesContext.HeaderDataCache();
+    headerDataCache.setHeader(vcfHeader);
+    ((LazyVCFGenotypesContext) genotypes).getParser().setHeaderDataCache(headerDataCache);
+    builder.genotypes(genotypes);
+    return builder.make();
   }
 
   @Override
@@ -109,13 +99,13 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
   }
 
   public int getKeyStart(VariantContext variant) {
-    String keyStartString = (String) variant.getAttribute("KEY_START");
+    String keyStartString = (String) variant.getAttribute(KEY_START);
     return keyStartString == null ? variant.getStart() : Integer.parseInt(keyStartString);
   }
 
   @Override
   public int getKeyEnd(VariantContext variant) {
-    String keyEndString = (String) variant.getAttribute("KEY_END");
+    String keyEndString = (String) variant.getAttribute(KEY_END);
     return keyEndString == null ? variant.getEnd() : Integer.parseInt(keyEndString);
   }
 
@@ -129,23 +119,10 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     };
   }
 
-  private static VariantContext newVariantContext(String contig, int start, int end, String ref, String alt,
-      int keyStart, int keyEnd, Genotype genotype) {
-    VariantContextBuilder builder = new VariantContextBuilder();
-    builder.source(HBaseVariantContextEncoder.class.getSimpleName());
-    builder.chr(contig);
-    builder.start(start);
-    builder.stop(end);
-    builder.alleles(ref, alt);
-    setKeyStartAndEnd(builder, keyStart, keyEnd);
-    builder.genotypes(genotype);
-    return builder.make();
-  }
-
   private static VariantContextBuilder setKeyStartAndEnd(VariantContextBuilder
       builder, int keyStart, int keyEnd) {
-    builder.attribute("KEY_START", Integer.toString(keyStart));
-    builder.attribute("KEY_END", Integer.toString(keyEnd));
+    builder.attribute(KEY_START, Integer.toString(keyStart));
+    builder.attribute(KEY_END, Integer.toString(keyEnd));
     return builder;
   }
 }
