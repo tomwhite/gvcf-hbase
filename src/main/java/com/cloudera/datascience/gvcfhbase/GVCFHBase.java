@@ -27,7 +27,8 @@ import org.apache.spark.api.java.function.VoidFunction;
 import scala.Tuple2;
 
 /**
- * Provides methods to store gVCF data in HBase, and scan over it.
+ * Provides methods to store RDDs of variants in HBase, and load from HBase back into
+ * RDDs of variants.
  */
 public class GVCFHBase {
 
@@ -79,7 +80,7 @@ public class GVCFHBase {
    * @param <T> the return type; often
    * {@link htsjdk.variant.variantcontext.VariantContext}, when merging variant calls
    * @param <V> the variant type, typically {@link htsjdk.variant.variantcontext.VariantContext}
-   * @return
+   * @return an RDD of consolidated variants
    */
   @SuppressWarnings("unchecked")
   public static <T, V> JavaRDD<T> load(HBaseVariantEncoder<V> variantEncoder,
@@ -141,7 +142,7 @@ public class GVCFHBase {
    * @param sampleNameIndex the global sample name index
    * {@link htsjdk.variant.variantcontext.VariantContext}, when merging variant calls
    * @param <V> the variant type, typically {@link htsjdk.variant.variantcontext.VariantContext}
-   * @return
+   * @return an RDD of all the variants for a sample
    */
   @SuppressWarnings("unchecked")
   public static <V> JavaRDD<V> loadSingleSample(HBaseVariantEncoder<V> variantEncoder,
@@ -165,8 +166,8 @@ public class GVCFHBase {
                 Result result = row._2();
                 RowKey rowKey = RowKey.fromRowKeyBytes(result.getRow());
                 try {
-                  V variant = variantEncoder.decodeVariant(rowKey, Iterables
-                      .getOnlyElement(result.listCells()), false);
+                  V variant = variantEncoder.decodeVariant(rowKey,
+                      Iterables.getOnlyElement(result.listCells()), false);
                   if (variantEncoder.getStart(variant) != rowKey.getStart()) { // ignore
                     // fake variant from split
                     continue;
