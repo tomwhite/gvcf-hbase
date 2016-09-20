@@ -4,12 +4,14 @@ import com.clearspring.analytics.util.Lists;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.GenotypeBuilder;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
+import htsjdk.variant.vcf.VCFHeader;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.List;
@@ -241,9 +243,12 @@ public class TestGVCF implements Serializable {
     // insert into HBase
     Configuration conf = testUtil.getConfiguration();
     JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, conf);
-    SampleNameIndex sampleNameIndex = new SampleNameIndex(ImmutableList.of("a", "b"));
+
+    ImmutableList<String> sampleNames = ImmutableList.of("a", "b");
+    SampleNameIndex sampleNameIndex = new SampleNameIndex(sampleNames);
+    VCFHeader vcfHeader = new VCFHeader(Sets.newHashSet(), sampleNames);
     HBaseVariantEncoder<VariantContext> variantEncoder =
-        new HBaseVariantContextEncoder(sampleNameIndex);
+        new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader);
     GVCFHBase.put(rdd1, variantEncoder, tableName, hbaseContext, splitSize);
     GVCFHBase.put(rdd2, variantEncoder, tableName, hbaseContext, splitSize);
 
@@ -253,6 +258,8 @@ public class TestGVCF implements Serializable {
     //allVariants.forEach(System.out::println);
 
     testUtil.deleteTable(tableName);
+
+    jsc.stop();
 
     return allVariants;
   }

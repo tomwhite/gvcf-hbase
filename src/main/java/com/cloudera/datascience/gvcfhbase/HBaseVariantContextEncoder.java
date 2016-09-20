@@ -29,15 +29,10 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
   private final SampleNameIndex sampleNameIndex;
   private final VCFHeader vcfHeader;
 
-  public HBaseVariantContextEncoder(SampleNameIndex sampleNameIndex) {
-    this(sampleNameIndex, null);
-  }
-
   public HBaseVariantContextEncoder(SampleNameIndex sampleNameIndex, VCFHeader vcfHeader) {
     this.sampleNameIndex = sampleNameIndex;
     this.vcfHeader = vcfHeader;
   }
-
 
   @Override
   public int getNumSamples() {
@@ -65,6 +60,10 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
   @Override
   public VariantContext decodeVariant(RowKey rowKey, Cell cell, boolean
       includeKeyAttributes) throws IOException {
+
+    int sampleIndex = Bytes.toInt(cell.getQualifierArray(), cell.getQualifierOffset());
+    String sampleName = sampleNameIndex.getSampleName(sampleIndex);
+
     ByteArrayInputStream bais = new ByteArrayInputStream(cell
         .getValueArray(), cell.getValueOffset(),
         cell.getValueLength());
@@ -76,8 +75,11 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
       builder.rmAttributes(ImmutableList.of(KEY_START, KEY_END));
     }
     GenotypesContext genotypes = variant.getGenotypes();
+    Preconditions.checkArgument(variant.getNSamples() == 1);
     LazyVCFGenotypesContext.HeaderDataCache headerDataCache = new LazyVCFGenotypesContext.HeaderDataCache();
-    headerDataCache.setHeader(vcfHeader);
+    // TODO: cache these
+    VCFHeader singleSampleHeader = new VCFHeader(vcfHeader.getMetaDataInInputOrder(), ImmutableList.of(sampleName));
+    headerDataCache.setHeader(singleSampleHeader);
     ((LazyVCFGenotypesContext) genotypes).getParser().setHeaderDataCache(headerDataCache);
     builder.genotypes(genotypes);
     return builder.make();
