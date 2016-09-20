@@ -32,4 +32,8 @@ public class SampleNameIndex implements Serializable {
   public int getSampleIndex(String sampleName) {
     return sampleNamesToIndexes.get(sampleName);
   }
+
+  public List<String> getSampleNames() {
+    return sampleNames;
+  }
 }

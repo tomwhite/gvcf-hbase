@@ -2,6 +2,7 @@ package com.cloudera.datascience.gvcfhbase;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.GenotypesContext;
 import htsjdk.variant.variantcontext.VariantContext;
@@ -13,6 +14,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Map;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -27,11 +29,15 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
   public static final String KEY_END = "KEY_END";
 
   private final SampleNameIndex sampleNameIndex;
-  private final VCFHeader vcfHeader;
+  private final Map<String, VCFHeader> perSampleHaders;
 
   public HBaseVariantContextEncoder(SampleNameIndex sampleNameIndex, VCFHeader vcfHeader) {
     this.sampleNameIndex = sampleNameIndex;
-    this.vcfHeader = vcfHeader;
+    perSampleHaders = Maps.newLinkedHashMap();
+    for (String sampleName : sampleNameIndex.getSampleNames()) {
+      perSampleHaders.put(sampleName,
+          new VCFHeader(vcfHeader.getMetaDataInInputOrder(), ImmutableList.of(sampleName)));
+    }
   }
 
   @Override
@@ -45,14 +51,15 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     // gvcf files
     Preconditions.checkArgument(variant.getNSamples() == 1);
     Genotype genotype = variant.getGenotype(0);
-    int sampleIndex = sampleNameIndex.getSampleIndex(genotype.getSampleName());
+    String sampleName = genotype.getSampleName();
+    int sampleIndex = sampleNameIndex.getSampleIndex(sampleName);
     int keyStart = getKeyStart(variant);
     byte[] rowKey = RowKey.toRowKeyBytes(variant.getContig(), keyStart);
     Put put = new Put(rowKey);
     byte[] qualifier = Bytes.toBytes(sampleIndex);
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(baos);
-    VariantContextCodec.write(out, new VariantContextWithHeader(variant, vcfHeader));
+    VariantContextCodec.write(out, new VariantContextWithHeader(variant, perSampleHaders.get(sampleName)));
     put.addColumn(GVCFHBase.SAMPLE_COLUMN_FAMILY, qualifier, baos.toByteArray());
     return put;
   }
@@ -77,9 +84,7 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     GenotypesContext genotypes = variant.getGenotypes();
     Preconditions.checkArgument(variant.getNSamples() == 1);
     LazyVCFGenotypesContext.HeaderDataCache headerDataCache = new LazyVCFGenotypesContext.HeaderDataCache();
-    // TODO: cache these
-    VCFHeader singleSampleHeader = new VCFHeader(vcfHeader.getMetaDataInInputOrder(), ImmutableList.of(sampleName));
-    headerDataCache.setHeader(singleSampleHeader);
+    headerDataCache.setHeader(perSampleHaders.get(sampleName));
     ((LazyVCFGenotypesContext) genotypes).getParser().setHeaderDataCache(headerDataCache);
     builder.genotypes(genotypes);
     return builder.make();
