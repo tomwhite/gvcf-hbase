@@ -87,7 +87,7 @@ public class TestCombineGVCFs {
     GVCFHBase.store(rdd2, variantEncoder2, tableName, hbaseContext, splitSize);
 
     List<VariantContext> allVariants = GVCFHBase.load(variantEncoder1, tableName,
-        hbaseContext, new CombineGCVFsVariantCombiner()).collect();
+        hbaseContext, new CombineGCVFs.CombineGCVFsVariantCombiner()).collect();
     TestGVCF.assertEqualVariants(expectedAllVariants, allVariants);
   }
 }
