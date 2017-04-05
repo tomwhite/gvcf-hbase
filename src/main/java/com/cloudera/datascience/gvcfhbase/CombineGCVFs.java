@@ -1,6 +1,7 @@
 package com.cloudera.datascience.gvcfhbase;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -24,6 +25,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hbase.TableName;
@@ -107,15 +109,16 @@ public class CombineGCVFs {
 
     private Iterable<VariantContext> fillInNoCalls(Locatable loc,
         Iterable<VariantContext> vcs, ReferenceSequence ref) {
+      VariantContext variantContext = StreamSupport.stream(vcs.spliterator(), false)
+          .filter(vc -> vc != null).findFirst().get(); // TODO: shouldn't be null, but check
       return Iterables.transform(vcs, vc -> {
         if (vc != null) {
           return vc;
         }
-        Allele refAllele = Allele.create(ref.getBases()[0], true);
         GenotypesContext genotypes = GenotypesContext.create();
-        genotypes.add(new GenotypeBuilder().alleles
+        genotypes.add(new GenotypeBuilder("NA12879").alleles // TODO: need to get sample name correctly!
             (GATKVariantContextUtils.noCallAlleles(2)).make()); // TODO: don't hardcode ploidy
-        return new VariantContextBuilder("", loc.getContig(), loc.getStart(), loc.getEnd(), Arrays.asList(refAllele, GATKVCFConstants.NON_REF_SYMBOLIC_ALLELE)).genotypes(genotypes).make();
+        return new VariantContextBuilder(variantContext).genotypes(genotypes).make();
       });
     }
 

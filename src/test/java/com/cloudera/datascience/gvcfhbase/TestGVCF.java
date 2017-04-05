@@ -232,6 +232,25 @@ public class TestGVCF implements Serializable {
   }
 
   @Test
+  public void testNoCallMidBlock() throws Exception {
+    ImmutableList<VariantContext> gvcf1 = ImmutableList.of(
+        newVariantContext("20", 1, 4, "A", "<NON_REF>", "a", "0/0"));
+
+    ImmutableList<VariantContext> gvcf2 = ImmutableList.of(
+        newVariantContext("20", 1, 1, "A", "<NON_REF>", "b", "0/0"),
+        newVariantContext("20", 2, 2, "G", "<NON_REF>", "b", "0/0"));
+
+
+    List<String> expectedAllVariants = ImmutableList.of(
+        "20:1-1,A:<NON_REF>:0/0(1-4),A:<NON_REF>:0/0(1-1)",
+        "20:2-2,A:<NON_REF>:0/0(1-4),G:<NON_REF>:0/0(2-2)",
+        "20:3-4,?:<NON_REF>:0/0(1-4),./.");
+
+    List<String> allVariants = storeAndLoad(gvcf1, gvcf2, new PrintVariantCombiner());
+    assertEquals(expectedAllVariants, allVariants);
+  }
+
+  @Test
   public void testRoundTrip() throws Exception {
     List<VariantContext> expectedVariants = new ArrayList<>();
     VCFFileReader vcfFileReader = new VCFFileReader(new File("src/test/resources/g.vcf"), false);
