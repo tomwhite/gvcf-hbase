@@ -1,5 +1,6 @@
 package com.cloudera.datascience.gvcfhbase;
 
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -23,6 +24,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.spark.JavaHBaseContext;
@@ -97,9 +99,24 @@ public class CombineGCVFs {
     public Iterable<VariantContext> combine(Locatable loc, Iterable<VariantContext> v) {
       ReferenceDataSource referenceDataSource = new ReferenceFileSource(new File(referencePath)); // TODO: load ref from HDFS or nio path
       ReferenceSequence ref = referenceDataSource.queryAndPrefetch(loc.getContig(), loc.getStart(), loc.getStart() + 10000);// TODO: get full reference for the partition
-      PositionalState positionalState = new PositionalState(Lists.newArrayList(v),
+      Iterable<VariantContext> variantContexts = fillInNoCalls(loc, v, ref);
+      PositionalState positionalState = new PositionalState(Lists.newArrayList(variantContexts),
           ref.getBases(), loc);
       return reduce(positionalState, overallState);
+    }
+
+    private Iterable<VariantContext> fillInNoCalls(Locatable loc,
+        Iterable<VariantContext> vcs, ReferenceSequence ref) {
+      return Iterables.transform(vcs, vc -> {
+        if (vc != null) {
+          return vc;
+        }
+        Allele refAllele = Allele.create(ref.getBases()[0], true);
+        GenotypesContext genotypes = GenotypesContext.create();
+        genotypes.add(new GenotypeBuilder().alleles
+            (GATKVariantContextUtils.noCallAlleles(2)).make()); // TODO: don't hardcode ploidy
+        return new VariantContextBuilder("", loc.getContig(), loc.getStart(), loc.getEnd(), Arrays.asList(refAllele, GATKVCFConstants.NON_REF_SYMBOLIC_ALLELE)).genotypes(genotypes).make();
+      });
     }
 
     private Iterable<VariantContext> reduce(final PositionalState startingStates, final OverallState

@@ -374,9 +374,13 @@ public class TestGVCF implements Serializable {
 
     assertEquals(v1.size(), v2.size());
     for (int i = 0; i < v1.size(); i++) {
-      assertEquals (v1.get(i).toStringDecodeGenotypes().replaceFirst("\\[VC [^ ]+", "[VC "),
-          v2.get(i).toStringDecodeGenotypes().replaceFirst("\\[VC [^ ]+", "[VC "));
+      assertEquals(str(v1.get(i)), str(v2.get(i)));
     }
+  }
+
+  private static String str(VariantContext v) {
+    // strip out source (since it can differ) and attr (since number formatting may differ)
+    return v.toStringDecodeGenotypes().replaceFirst("\\[VC [^ ]+", "[VC ").replaceFirst("attr=\\{[^\\}]*\\}", "");
   }
 
 }
