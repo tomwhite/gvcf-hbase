@@ -61,6 +61,19 @@
       </exclusions>
     </dependency>
     <dependency>
+      <groupId>org.broadinstitute</groupId>
+      <artifactId>gatk</artifactId>
+      <version>4.alpha.2-189-g056f196-20170404.231309-1</version>
+      <exclusions>
+        <!-- exclude all gatk transitive dependencies: pull in any that are needed by
+        hand -->
+        <exclusion>
+          <groupId>*</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-testing-util</artifactId>
       <version>1.2.0-cdh5.8.1</version>
@@ -77,6 +90,16 @@
     <repository>
       <id>cloudera</id>
       <url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
+    </repository>
+    <repository>
+      <id>broad</id>
+      <url>https://artifactory.broadinstitute.org/artifactory/libs-snapshot/</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
     </repository>
   </repositories>
   <build>

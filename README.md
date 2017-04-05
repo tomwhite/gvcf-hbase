@@ -71,3 +71,9 @@ overlaps the 4 split point. This allows the process reading the second split (wh
 starts at position 5) to access information at positions 5, 6, and 7 in the block, 
 which would not have been possible otherwise if the block has not been split, since the
 record would have been only readable from the previous partition.
+
+# Building
+
+```
+mvn install -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dhttps.protocols="TLSv1.2"
+```
