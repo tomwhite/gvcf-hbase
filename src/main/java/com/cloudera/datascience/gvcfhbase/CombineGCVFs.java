@@ -20,8 +20,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.spark.JavaHBaseContext;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.spark.api.java.JavaRDD;
 
 /**
@@ -224,7 +226,8 @@ public class CombineGCVFs {
       //output the stopped VCs if there is no previous output (state.prevPos == null) or our current position is past
       // the last write position (state.prevPos)
       //NOTE: BP resolution with have current position == state.prevPos because it gets output via a different control flow
-      if ( !stoppedVCs.isEmpty() &&  (state.prevPos == null || pos.isPast(state.prevPos) )) {
+      if ( !stoppedVCs.isEmpty() &&  (state.prevPos == null || isPast(pos, state.prevPos)
+      )) {
         final Locatable gLoc = new Interval(stoppedVCs.get(0).getChr(), pos.getStart(), pos.getStart());
 
         // we need the specialized merge if the site contains anything other than ref blocks
@@ -306,5 +309,16 @@ public class CombineGCVFs {
       }
       return ImmutableList.of();
     }
+  }
+
+  /**
+   * Based on logic in GenomeLoc#isPast
+   */
+  private static boolean isPast(Locatable pos1, Locatable pos2) {
+    // TODO: reconcile with RowKey
+    byte[] contig1Bytes = Bytes.toBytes(StringUtils.leftPad(pos1.getContig(), 2));
+    byte[] contig2Bytes = Bytes.toBytes(StringUtils.leftPad(pos2.getContig(), 2));
+    int comparison = Bytes.compareTo(contig1Bytes, contig2Bytes);
+    return ( comparison == 1 || ( comparison == 0 && pos1.getStart() > pos2.getEnd() ));
   }
 }
