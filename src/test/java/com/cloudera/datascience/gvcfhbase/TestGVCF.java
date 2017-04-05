@@ -333,6 +333,20 @@ public class TestGVCF implements Serializable {
    * Compares VariantContext by comparing toStringDecodeGenotypes
    */
   public static void assertEqualVariants(final List<VariantContext> v1, final List<VariantContext> v2) {
+
+    // debug
+//    System.out.println("Expected");
+//    for (int i = 0; i < v1.size(); i++) {
+//      System.out.println(v1.get(i).toStringDecodeGenotypes().replaceFirst("\\[VC [^ ]+", "[VC "));
+//    }
+//
+//    System.out.println();
+//    System.out.println("Actual");
+//    for (int i = 0; i < v2.size(); i++) {
+//      System.out.println(v2.get(i).toStringDecodeGenotypes().replaceFirst("\\[VC [^ " +
+//          "]+", "[VC "));
+//    }
+
     assertEquals(v1.size(), v2.size());
     for (int i = 0; i < v1.size(); i++) {
       assertEquals (v1.get(i).toStringDecodeGenotypes().replaceFirst("\\[VC [^ ]+", "[VC "),

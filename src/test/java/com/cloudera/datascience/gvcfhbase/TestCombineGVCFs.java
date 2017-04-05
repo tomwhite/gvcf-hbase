@@ -24,7 +24,7 @@ import org.junit.Test;
 public class TestCombineGVCFs {
   private static HBaseTestingUtility testUtil;
 
-  private int splitSize = 4;
+  private int splitSize = Integer.MAX_VALUE;
   private TableName tableName = TableName.valueOf("gvcf");
 
   @BeforeClass
