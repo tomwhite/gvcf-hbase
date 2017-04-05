@@ -70,6 +70,10 @@ public class TestGVCF implements Serializable {
       sb.append(loc.getContig()).append(":").append(loc.getStart()).append("-")
           .append(loc.getEnd()).append(",");
       for (VariantContext variant : variants) {
+        if (variant == null) {
+          sb.append("./.,");
+          continue;
+        }
         List<Allele> alleles = variant.getAlleles();
         Genotype genotype = variant.getGenotype(0);
         sb.append(alleles.get(0).getDisplayString()).append(":");
@@ -204,6 +208,27 @@ public class TestGVCF implements Serializable {
     List<String> allVariants = storeAndLoad(gvcf1, gvcf2, new PrintVariantCombiner());
     assertEquals(expectedAllVariants, allVariants);
 
+  }
+
+  @Test
+  public void testNoCall() throws Exception {
+    ImmutableList<VariantContext> gvcf1 = ImmutableList.of(
+        newVariantContext("20", 1, 1, "A", "G", "a", "0/1"),
+        newVariantContext("20", 2, 7, "G", "<NON_REF>", "a", "0/0"),
+        newVariantContext("20", 8, 8, "G", "C", "a", "1/1"));
+
+    // note missing calls for positions 2-8
+    ImmutableList<VariantContext> gvcf2 = ImmutableList.of(
+        newVariantContext("20", 1, 1, "A", "G", "b", "1/1"));
+
+    List<String> expectedAllVariants = ImmutableList.of(
+        "20:1-1,A:G:0/1(1-1),A:G:1/1(1-1)",
+        "20:2-4,G:<NON_REF>:0/0(2-7),./.",
+        "20:5-7,G:<NON_REF>:0/0(2-7),./.", // due to split
+        "20:8-8,G:C:1/1(8-8),./.");
+
+    List<String> allVariants = storeAndLoad(gvcf1, gvcf2, new PrintVariantCombiner());
+    assertEquals(expectedAllVariants, allVariants);
   }
 
   @Test

@@ -4,6 +4,7 @@ import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import htsjdk.samtools.util.Interval;
+import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -113,13 +114,20 @@ public class GVCFHBase {
                   }
                   // how many positions we can iterate over before the next row
                   int nextKeyEnd = Integer.MAX_VALUE;
-                  for (V variant : variantsBySampleIndex) {
-                    nextKeyEnd = Math.min(variantEncoder.getKeyEnd(variant), nextKeyEnd);
+                  for (int i = 0; i < variantsBySampleIndex.size(); i++) {
+                    V variant = variantsBySampleIndex.get(i);
+                    if (variant != null) { // a variant may be null if it's missing for this position (no call)
+                      int keyEnd = variantEncoder.getKeyEnd(variant);
+                      if (keyEnd >= rowKey.getStart()) {
+                        nextKeyEnd = Math.min(keyEnd, nextKeyEnd);
+                      } else {
+                        variantsBySampleIndex.set(i, null); // remove any variants or blocks that end before current start (no call)
+                      }
+                    }
                   }
-
-                  Iterable<T> values = variantCombiner.combine(
-                          new Interval(rowKey.getContig(), rowKey.getStart(), nextKeyEnd),
-                          variantsBySampleIndex);
+                  Locatable loc = new Interval(rowKey.getContig(), rowKey.getStart(), nextKeyEnd);
+                  //System.out.println("combine at " + loc);
+                  Iterable<T> values = variantCombiner.combine(loc, variantsBySampleIndex);
                   Iterables.addAll(buffer, values);
                 } catch (Exception e) {
                   throw new RuntimeException(e);
