@@ -12,6 +12,7 @@ import htsjdk.variant.variantcontext.GenotypesContext;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
 import htsjdk.variant.vcf.VCFConstants;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -25,6 +26,8 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.spark.JavaHBaseContext;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.spark.api.java.JavaRDD;
+import org.broadinstitute.hellbender.utils.variant.GATKVCFConstants;
+import org.broadinstitute.hellbender.utils.variant.GATKVariantContextUtils;
 
 /**
  * This is a HBase and Spark verion of GATK3's CombineGCVFs.
@@ -65,7 +68,7 @@ public class CombineGCVFs {
     }
   }
 
-  private static class OverallState {
+  private static class OverallState implements Serializable {
     final LinkedList<VariantContext> VCs = new LinkedList<>();
     final Set<String> samples = new HashSet<>();
     Locatable prevPos = null;
@@ -232,10 +235,14 @@ public class CombineGCVFs {
 
         // we need the specialized merge if the site contains anything other than ref blocks
         final VariantContext mergedVC;
-        if ( containsTrueAltAllele(stoppedVCs) )
-          mergedVC = ReferenceConfidenceVariantContextMerger.merge(stoppedVCs, gLoc, refBase, false, false, annotationEngine);
-        else
+        if ( containsTrueAltAllele(stoppedVCs) ) {
+          // TODO: make instance variable (but need to make serializable)
+          ReferenceConfidenceVariantContextMerger merger = new
+              ReferenceConfidenceVariantContextMerger();
+          mergedVC = merger.merge(stoppedVCs, gLoc, refBase, false, false);
+        } else {
           mergedVC = referenceBlockMerge(stoppedVCs, state, pos.getStart());
+        }
 
         ret.add(mergedVC);
         state.prevPos = gLoc;
