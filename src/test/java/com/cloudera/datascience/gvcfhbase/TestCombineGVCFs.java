@@ -86,8 +86,9 @@ public class TestCombineGVCFs {
     GVCFHBase.store(rdd1, variantEncoder1, tableName, hbaseContext, splitSize);
     GVCFHBase.store(rdd2, variantEncoder2, tableName, hbaseContext, splitSize);
 
-    List<VariantContext> allVariants = GVCFHBase.load(variantEncoder1, tableName,
-        hbaseContext, new CombineGCVFs.CombineGCVFsVariantCombiner()).collect();
+    List<VariantContext> allVariants = CombineGCVFs.combine(variantEncoder1, tableName, hbaseContext,
+        "/Users/tom/workspace/gatk/src/test/resources/large/human_g1k_v37.20.21.fasta")
+        .collect();
     TestGVCF.assertEqualVariants(expectedAllVariants, allVariants);
   }
 }

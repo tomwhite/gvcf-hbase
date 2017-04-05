@@ -3,6 +3,7 @@ package com.cloudera.datascience.gvcfhbase;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import htsjdk.samtools.reference.ReferenceSequence;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.Allele;
@@ -12,6 +13,7 @@ import htsjdk.variant.variantcontext.GenotypesContext;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
 import htsjdk.variant.vcf.VCFConstants;
+import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,6 +28,8 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.spark.JavaHBaseContext;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.spark.api.java.JavaRDD;
+import org.broadinstitute.hellbender.engine.ReferenceDataSource;
+import org.broadinstitute.hellbender.engine.ReferenceFileSource;
 import org.broadinstitute.hellbender.utils.variant.GATKVCFConstants;
 import org.broadinstitute.hellbender.utils.variant.GATKVariantContextUtils;
 
@@ -40,8 +44,7 @@ import org.broadinstitute.hellbender.utils.variant.GATKVariantContextUtils;
 public class CombineGCVFs {
 
   public static JavaRDD<VariantContext> combine(HBaseVariantEncoder<VariantContext> variantEncoder,
-      TableName tableName, JavaHBaseContext
-      hbaseContext) {
+      TableName tableName, JavaHBaseContext hbaseContext, String referencePath) {
     // naively, one would think that we could use Spark aggregate here, but the way
     // that GATK3 MR framework works is that there is a single reduce object
     // (OverallState) since the framework runs on one machine (multi-threaded)
@@ -50,7 +53,7 @@ public class CombineGCVFs {
     // What we can do is run a mapPartitions, and do the aggregation in there, so there
     // is one OverallState per partition.
     return GVCFHBase.load(variantEncoder, tableName, hbaseContext,
-        new CombineGCVFsVariantCombiner());
+        new CombineGCVFsVariantCombiner(referencePath));
   }
 
   private static class PositionalState {
@@ -84,11 +87,18 @@ public class CombineGCVFs {
     private int multipleAtWhichToBreakBands = 0;
 
     private final OverallState overallState = new OverallState();
+    private String referencePath;
+
+    public CombineGCVFsVariantCombiner(String referencePath) {
+      this.referencePath = referencePath;
+    }
 
     @Override
     public Iterable<VariantContext> combine(Locatable loc, Iterable<VariantContext> v) {
+      ReferenceDataSource referenceDataSource = new ReferenceFileSource(new File(referencePath)); // TODO: load ref from HDFS or nio path
+      ReferenceSequence ref = referenceDataSource.queryAndPrefetch(loc.getContig(), loc.getStart(), loc.getStart() + 10000);// TODO: get full reference for the partition
       PositionalState positionalState = new PositionalState(Lists.newArrayList(v),
-          null, loc); // TODO: ref bases
+          ref.getBases(), loc);
       return reduce(positionalState, overallState);
     }
 
