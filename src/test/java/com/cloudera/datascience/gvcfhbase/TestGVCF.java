@@ -31,6 +31,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -246,6 +247,29 @@ public class TestGVCF implements Serializable {
         "20:1-1,A:<NON_REF>:0/0(1-4),A:<NON_REF>:0/0(1-1)",
         "20:2-2,A:<NON_REF>:0/0(1-4),G:<NON_REF>:0/0(2-2)",
         "20:3-4,A:<NON_REF>:0/0(1-4),./.");
+
+    List<String> allVariants = storeAndLoad(gvcf1, gvcf2, new PrintVariantCombiner());
+    assertEquals(expectedAllVariants, allVariants);
+  }
+
+  @Test
+  @Ignore
+  // test case equivalent for the GenomicsDB test. The trouble is that gvcf2 starts
+  // after gvcf1, and we don't know when the first variant in gvcf2 is (i.e. what to
+  // set nextKeyEnd to in GVCFHBase#load). To cover this case, we need a way of having a
+  // surrogate variantsBySampleIndex - perhaps by doing an initial query to find the
+  // position of the first variant in each sample for each partition.
+  public void testNoCallAtStart() throws Exception {
+    ImmutableList<VariantContext> gvcf1 = ImmutableList.of(
+        newVariantContext("20", 1, 4, "A", "<NON_REF>", "a", "0/0"));
+
+    ImmutableList<VariantContext> gvcf2 = ImmutableList.of(
+        newVariantContext("20", 2, 4, "G", "<NON_REF>", "b", "0/0"));
+
+
+    List<String> expectedAllVariants = ImmutableList.of(
+        "20:1-1,A:<NON_REF>:0/0(1-4),./.",
+        "20:2-4,A:<NON_REF>:0/0(1-4),G:<NON_REF>:0/0(2-4)");
 
     List<String> allVariants = storeAndLoad(gvcf1, gvcf2, new PrintVariantCombiner());
     assertEquals(expectedAllVariants, allVariants);

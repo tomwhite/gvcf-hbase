@@ -75,7 +75,7 @@ public class TestCombineGVCFs {
 //        { ImmutableList.of("src/test/resources/g.vcf", "src/test/resources/g4.vcf"),
 //            "src/test/resources/g1g4.vcf",
 //            "/Users/tom/workspace/gatk/src/test/resources/large/human_g1k_v37.20.21.fasta" },
-        // TODO: investigate failing test and fix
+        // TODO: investigate failing test and fix - see testNoCallAtStart
 //        { ImmutableList.of("src/test/resources/t0.vcf", "src/test/resources/t1.vcf", "src/test/resources/t2.vcf"),
 //            "src/test/resources/t0_1_2_combined.vcf",
 //            "src/test/resources/chr1_10MB.fasta" },

@@ -161,7 +161,7 @@ public class GVCFHBase {
                     continue; // all variants were null, so finish
                   }
                   Locatable loc = new Interval(rowKey.getContig(), rowKey.getStart(), nextKeyEnd);
-                  //System.out.println("combine at " + loc);
+                  System.out.println("combine at " + loc);
                   Iterable<T> values = variantCombiner.combine(loc,
                       variantsBySampleIndex, variantEncoder.getSampleNameIndex());
                   Iterables.addAll(buffer, values);
