@@ -54,18 +54,27 @@ public class TestCombineGVCFs {
   @Test
   public void testCombineGVCFs() throws Exception {
     List<VariantContext> variants1 = new ArrayList<>();
-    VCFFileReader vcfFileReader1 = new VCFFileReader(new File("src/test/resources/g.vcf"), false);
+    VCFFileReader vcfFileReader1 = new VCFFileReader(new File("src/test/resources/t0" +
+        ".vcf"), false);
 
     Iterators.addAll(variants1, vcfFileReader1.iterator());
     VCFHeader vcfHeader1 = vcfFileReader1.getFileHeader();
 
     List<VariantContext> variants2 = new ArrayList<>();
-    VCFFileReader vcfFileReader2 = new VCFFileReader(new File("src/test/resources/g2.vcf"), false);
+    VCFFileReader vcfFileReader2 = new VCFFileReader(new File("src/test/resources/t1" +
+        ".vcf"), false);
     Iterators.addAll(variants2, vcfFileReader2.iterator());
     VCFHeader vcfHeader2 = vcfFileReader2.getFileHeader();
 
+    List<VariantContext> variants3 = new ArrayList<>();
+    VCFFileReader vcfFileReader3 = new VCFFileReader(new File("src/test/resources/t2" +
+        ".vcf"), false);
+    Iterators.addAll(variants3, vcfFileReader3.iterator());
+    VCFHeader vcfHeader3 = vcfFileReader2.getFileHeader();
+
     List<VariantContext> expectedAllVariants = new ArrayList<>();
-    VCFFileReader expectedAllVariantsReader = new VCFFileReader(new File("src/test/resources/g1g2.vcf"), false);
+    VCFFileReader expectedAllVariantsReader = new VCFFileReader(new File
+        ("src/test/resources/t0_1_2_combined.vcf"), false);
     Iterators.addAll(expectedAllVariants, expectedAllVariantsReader.iterator());
     VCFHeader expectedAllVariantsHeader = expectedAllVariantsReader.getFileHeader();
 
@@ -77,22 +86,26 @@ public class TestCombineGVCFs {
     JavaSparkContext jsc = new JavaSparkContext(sparkConf);
     JavaRDD<VariantContext> rdd1 = jsc.parallelize(variants1);
     JavaRDD<VariantContext> rdd2 = jsc.parallelize(variants2);
+    JavaRDD<VariantContext> rdd3 = jsc.parallelize(variants3);
 
     // store in HBase
     Configuration conf = testUtil.getConfiguration();
     JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, conf);
     SampleNameIndex sampleNameIndex = new SampleNameIndex(
-        com.google.common.collect.Lists.newArrayList("NA12878", "NA12879")
+        com.google.common.collect.Lists.newArrayList("HG00141", "HG01958", "HG01530")
     );
     HBaseVariantEncoder<VariantContext> variantEncoder1 =
         new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader1);
     HBaseVariantEncoder<VariantContext> variantEncoder2 =
-        new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader2);
+        new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader3);
+    HBaseVariantEncoder<VariantContext> variantEncoder3 =
+        new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader3);
     GVCFHBase.store(rdd1, variantEncoder1, tableName, hbaseContext, splitSize, jsc);
     GVCFHBase.store(rdd2, variantEncoder2, tableName, hbaseContext, splitSize, jsc);
+    GVCFHBase.store(rdd3, variantEncoder3, tableName, hbaseContext, splitSize, jsc);
 
     List<VariantContext> allVariants = CombineGCVFs.combine(variantEncoder1, tableName, hbaseContext,
-        "/Users/tom/workspace/gatk/src/test/resources/large/human_g1k_v37.20.21.fasta")
+        "/Users/tom/Downloads/chr1_10MB.fasta")
         .collect();
     TestGVCF.assertEqualVariants(expectedAllVariants, allVariants);
   }
