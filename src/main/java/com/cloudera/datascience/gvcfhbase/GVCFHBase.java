@@ -57,27 +57,42 @@ public class GVCFHBase {
     // last element in the last partition.
     JavaRDD<V> rddWithNextElt = withFirstElementFromNextPartition(ctx, rdd);
 
-    bulkPut(hbaseContext, rddWithNextElt, tableName, (FlatMapFunction<V, Put>) v -> {
-      if (v == null) {
-        System.out.println("woot!");
-        return ImmutableList.of();
+    bulkPut(hbaseContext, rddWithNextElt, tableName, new FlatMapFunction<V, Put>() {
+      V prevVariant;
+      @Override
+      public Iterable<Put> call(V v) throws Exception {
+        if (v == null) {
+          System.out.println("woot! last variant");
+          //return ImmutableList.of(variantEncoder.encodeNoCallFollowing(prevVariant));
+          return ImmutableList.of();
+        }
+        List<Put> puts = new ArrayList<>();
+        int prevEnd = prevVariant == null ? -1 : variantEncoder.getEnd(prevVariant);
+        int start = variantEncoder.getStart(v);
+        int end = variantEncoder.getEnd(v);
+
+        if (prevVariant != null && prevEnd + 1 < start) {
+          // found a gap, so add a row with a null variant to represent a no call
+          // TODO: handle contig and split boundaries (for end of contig, always add a null)
+          puts.add(variantEncoder.encodeNoCallFollowing(prevVariant));
+        }
+
+        int startSplitIndex = (start - 1) / splitSize; // start and end are 1-based
+        // like VCF
+        int endSplitIndex = (end - 1) / splitSize;
+        if (startSplitIndex == endSplitIndex) {
+          puts.add(variantEncoder.encodeVariant(v));
+        } else {
+          // break into two variants
+          int key2Start = (startSplitIndex + 1) * splitSize + 1;
+          int key1End = key2Start - 1;
+          V[] vs = variantEncoder.split(v, key1End, key2Start);
+          puts.add(variantEncoder.encodeVariant(vs[0]));
+          puts.add(variantEncoder.encodeVariant(vs[1]));
+        }
+        prevVariant = v;
+        return puts;
       }
-      List<Put> puts = null;
-      int start = variantEncoder.getStart(v);
-      int end = variantEncoder.getEnd(v);
-      int startSplitIndex = (start - 1) / splitSize; // start and end are 1-based like VCF
-      int endSplitIndex = (end - 1) / splitSize;
-      if (startSplitIndex == endSplitIndex) {
-        puts = ImmutableList.of(variantEncoder.encodeVariant(v));
-      } else {
-        // break into two variants
-        int key2Start = (startSplitIndex + 1) * splitSize + 1;
-        int key1End = key2Start - 1;
-        V[] vs = variantEncoder.split(v, key1End, key2Start);
-        puts = ImmutableList.of(variantEncoder.encodeVariant(vs[0]),
-            variantEncoder.encodeVariant(vs[1]));
-      }
-      return puts;
     });
   }
 
@@ -125,7 +140,7 @@ public class GVCFHBase {
                   RowKey rowKey = RowKey.fromRowKeyBytes(result.getRow());
                   for (Cell cell : result.listCells()) {
                     V variant = variantEncoder.decodeVariant(rowKey, cell, true);
-                    variantsBySampleIndex.set(variantEncoder.getSampleIndex(variant), variant);
+                    variantsBySampleIndex.set(variantEncoder.getSampleIndex(cell), variant);
                   }
                   // how many positions we can iterate over before the next row
                   int nextKeyEnd = Integer.MAX_VALUE;

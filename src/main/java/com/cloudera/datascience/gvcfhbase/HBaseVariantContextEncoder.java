@@ -65,10 +65,29 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
   }
 
   @Override
+  public Put encodeNoCallFollowing(VariantContext prevVariant) throws IOException {
+    // note that we only store one genotype here as we expect to load single sample
+    // gvcf files
+    Preconditions.checkArgument(prevVariant.getNSamples() == 1);
+    Genotype genotype = prevVariant.getGenotype(0);
+    String sampleName = genotype.getSampleName();
+    int sampleIndex = sampleNameIndex.getSampleIndex(sampleName);
+    int keyStart = getKeyStart(prevVariant);
+    byte[] rowKey = RowKey.toRowKeyBytes(prevVariant.getContig(), keyStart);
+    Put put = new Put(rowKey);
+    byte[] qualifier = Bytes.toBytes(sampleIndex);
+    put.addColumn(GVCFHBase.SAMPLE_COLUMN_FAMILY, qualifier, new byte[0]);
+    return put;
+  }
+
+  @Override
   public VariantContext decodeVariant(RowKey rowKey, Cell cell, boolean
       includeKeyAttributes) throws IOException {
+    if (cell.getValueLength() == 0) {
+      return null; // no call
+    }
 
-    int sampleIndex = Bytes.toInt(cell.getQualifierArray(), cell.getQualifierOffset());
+    int sampleIndex = getSampleIndex(cell);
     String sampleName = sampleNameIndex.getSampleName(sampleIndex);
 
     ByteArrayInputStream bais = new ByteArrayInputStream(cell
@@ -92,8 +111,8 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
   }
 
   @Override
-  public int getSampleIndex(VariantContext variant) {
-    return sampleNameIndex.getSampleIndex(variant.getGenotype(0).getSampleName());
+  public int getSampleIndex(Cell cell) {
+    return Bytes.toInt(cell.getQualifierArray(), cell.getQualifierOffset());
   }
 
   @Override

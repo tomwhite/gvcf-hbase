@@ -12,8 +12,9 @@ import org.apache.hadoop.hbase.client.Put;
 public abstract class HBaseVariantEncoder<V> {
   public abstract int getNumSamples();
   public abstract Put encodeVariant(V variant) throws IOException;
+  public abstract Put encodeNoCallFollowing(V prevVariant) throws IOException;
   public abstract V decodeVariant(RowKey rowKey, Cell cell, boolean includeKeyAttributes) throws IOException;
-  public abstract int getSampleIndex(V variant);
+  public abstract int getSampleIndex(Cell cell);
   public abstract int getStart(V variant);
   public abstract int getEnd(V variant);
   public abstract int getKeyEnd(V variant);
