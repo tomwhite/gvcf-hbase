@@ -3,9 +3,11 @@ package com.cloudera.datascience.gvcfhbase;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Iterators;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -21,7 +23,9 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.spark.JavaHBaseContext;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FlatMapFunction;
+import org.apache.spark.api.java.function.FlatMapFunction2;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
 import scala.Tuple2;
@@ -45,8 +49,19 @@ public class GVCFHBase {
    * @param <V> the variant type, typically {@link htsjdk.variant.variantcontext.VariantContext}
    */
   public static <V> void store(JavaRDD<V> rdd, HBaseVariantEncoder<V> variantEncoder,
-      TableName tableName, JavaHBaseContext hbaseContext, int splitSize) {
-    bulkPut(hbaseContext, rdd, tableName, (FlatMapFunction<V, Put>) v -> {
+      TableName tableName, JavaHBaseContext hbaseContext, int splitSize, JavaSparkContext ctx) {
+
+    // Add the first element from the next partition. Note that this duplicates elements,
+    // but that doeesn't matter since HBase will just have duplicate cells with different
+    // timestamps - there will not be extra rows. The only case we need to handle is the
+    // last element in the last partition.
+    JavaRDD<V> rddWithNextElt = withFirstElementFromNextPartition(ctx, rdd);
+
+    bulkPut(hbaseContext, rddWithNextElt, tableName, (FlatMapFunction<V, Put>) v -> {
+      if (v == null) {
+        System.out.println("woot!");
+        return ImmutableList.of();
+      }
       List<Put> puts = null;
       int start = variantEncoder.getStart(v);
       int end = variantEncoder.getEnd(v);
@@ -217,5 +232,30 @@ public class GVCFHBase {
             m.close();
           }
         });
+  }
+
+  /**
+   * For each partition, add the element from the next partition to the end. For the
+   * last partition add a null.
+   */
+  private static <T> JavaRDD<T> withFirstElementFromNextPartition(JavaSparkContext ctx, JavaRDD<T> rdd) {
+    int numPartitions = rdd.getNumPartitions();
+    // Find the first element in each partition
+    List<T> firstEltInEachPartition = rdd
+        .mapPartitions((FlatMapFunction<Iterator<T>, T>) it -> toIterable(Iterators.singletonIterator(it.next())))
+        .collect();
+    // Shift left, so that each partition will be joined with the first element from the
+    // _next_ partition
+    List<T> firstEltInNextPartition = new ArrayList<T>(firstEltInEachPartition.subList(1,
+        numPartitions));
+    firstEltInNextPartition.add(null); // the last partition does not have any elements to add to it
+
+    return rdd.zipPartitions(ctx.parallelize(firstEltInNextPartition, numPartitions),
+        (FlatMapFunction2<Iterator<T>, Iterator<T>, T>) (it1, it2) -> toIterable(Iterators.concat(it1, it2)));
+  }
+
+  // This is not needed with Spark 2
+  private static <T> Iterable<T> toIterable(Iterator<T> iterator) {
+    return () -> iterator;
   }
 }

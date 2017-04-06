@@ -83,8 +83,8 @@ public class TestCombineGVCFs {
         new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader1);
     HBaseVariantEncoder<VariantContext> variantEncoder2 =
         new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader2);
-    GVCFHBase.store(rdd1, variantEncoder1, tableName, hbaseContext, splitSize);
-    GVCFHBase.store(rdd2, variantEncoder2, tableName, hbaseContext, splitSize);
+    GVCFHBase.store(rdd1, variantEncoder1, tableName, hbaseContext, splitSize, jsc);
+    GVCFHBase.store(rdd2, variantEncoder2, tableName, hbaseContext, splitSize, jsc);
 
     List<VariantContext> allVariants = CombineGCVFs.combine(variantEncoder1, tableName, hbaseContext,
         "/Users/tom/workspace/gatk/src/test/resources/large/human_g1k_v37.20.21.fasta")

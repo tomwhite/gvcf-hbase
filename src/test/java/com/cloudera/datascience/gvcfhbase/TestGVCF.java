@@ -279,8 +279,8 @@ public class TestGVCF implements Serializable {
     );
     HBaseVariantEncoder<VariantContext> variantEncoder =
         new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader);
-    GVCFHBase.store(rdd, variantEncoder, tableName, hbaseContext, splitSize);
-    GVCFHBase.store(rdd2, variantEncoder, tableName, hbaseContext, splitSize);
+    GVCFHBase.store(rdd, variantEncoder, tableName, hbaseContext, splitSize, jsc);
+    GVCFHBase.store(rdd2, variantEncoder, tableName, hbaseContext, splitSize, jsc);
 
     // load from HBase
     List<VariantContext> actualVariants = GVCFHBase.loadSingleSample(variantEncoder, tableName,
@@ -356,8 +356,8 @@ public class TestGVCF implements Serializable {
     VCFHeader vcfHeader = new VCFHeader(Sets.newHashSet(), sampleNames);
     HBaseVariantEncoder<VariantContext> variantEncoder =
         new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader);
-    GVCFHBase.store(rdd1, variantEncoder, tableName, hbaseContext, splitSize);
-    GVCFHBase.store(rdd2, variantEncoder, tableName, hbaseContext, splitSize);
+    GVCFHBase.store(rdd1, variantEncoder, tableName, hbaseContext, splitSize, jsc);
+    GVCFHBase.store(rdd2, variantEncoder, tableName, hbaseContext, splitSize, jsc);
 
     // load from HBase
     List<T> allVariants = GVCFHBase.load(variantEncoder, tableName, hbaseContext, variantCombiner)
