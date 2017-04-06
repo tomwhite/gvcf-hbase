@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
@@ -110,14 +111,15 @@ public class CombineGCVFs {
     private Iterable<VariantContext> fillInNoCalls(Locatable loc,
         Iterable<VariantContext> vcs, ReferenceSequence ref) {
       VariantContext variantContext = StreamSupport.stream(vcs.spliterator(), false)
-          .filter(vc -> vc != null).findFirst().get(); // TODO: shouldn't be null, but check
+          .filter(Objects::nonNull).findFirst().get(); // TODO: shouldn't be null, but check
       return Iterables.transform(vcs, vc -> {
         if (vc != null) {
           return vc;
         }
         GenotypesContext genotypes = GenotypesContext.create();
+        int ploidy = variantContext.getGenotypes().get(0).getPloidy();
         genotypes.add(new GenotypeBuilder("NA12879").alleles // TODO: need to get sample name correctly!
-            (GATKVariantContextUtils.noCallAlleles(2)).make()); // TODO: don't hardcode ploidy
+            (GATKVariantContextUtils.noCallAlleles(ploidy)).make());
         return new VariantContextBuilder(variantContext).genotypes(genotypes).make();
       });
     }

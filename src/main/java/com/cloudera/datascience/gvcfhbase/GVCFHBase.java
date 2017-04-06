@@ -1,7 +1,6 @@
 package com.cloudera.datascience.gvcfhbase;
 
 import com.google.common.collect.AbstractIterator;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import htsjdk.samtools.util.Interval;
@@ -168,7 +167,7 @@ public class GVCFHBase {
               }
             }
           };
-          return (Iterable<T>) () -> it;
+          return toIterable(it);
         });
   }
 
@@ -218,7 +217,7 @@ public class GVCFHBase {
               }
             }
           };
-          return (Iterable<V>) () -> it;
+          return toIterable(it);
         });
   }
 

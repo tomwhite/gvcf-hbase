@@ -15,7 +15,8 @@ public interface VariantCombiner<V, T> extends Serializable {
    * The return value is zero or more combined values (e.g.
    * {@link htsjdk.variant.variantcontext.VariantContext}).
    * @param location the range of loci to consider
-   * @param variants the variants that start at the start of the location
+   * @param variants the variants that start at the start of the location, some of
+   *                 which may be null, indicating no calls
    * @return zero or more combined values
    */
   Iterable<T> combine(Locatable location, Iterable<V> variants);
