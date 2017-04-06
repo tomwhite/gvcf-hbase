@@ -72,7 +72,7 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
     Genotype genotype = prevVariant.getGenotype(0);
     String sampleName = genotype.getSampleName();
     int sampleIndex = sampleNameIndex.getSampleIndex(sampleName);
-    int keyStart = getKeyStart(prevVariant);
+    int keyStart = getKeyEnd(prevVariant) + 1; // no call follows previous end
     byte[] rowKey = RowKey.toRowKeyBytes(prevVariant.getContig(), keyStart);
     Put put = new Put(rowKey);
     byte[] qualifier = Bytes.toBytes(sampleIndex);

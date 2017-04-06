@@ -244,7 +244,7 @@ public class TestGVCF implements Serializable {
     List<String> expectedAllVariants = ImmutableList.of(
         "20:1-1,A:<NON_REF>:0/0(1-4),A:<NON_REF>:0/0(1-1)",
         "20:2-2,A:<NON_REF>:0/0(1-4),G:<NON_REF>:0/0(2-2)",
-        "20:3-4,?:<NON_REF>:0/0(1-4),./.");
+        "20:3-4,A:<NON_REF>:0/0(1-4),./.");
 
     List<String> allVariants = storeAndLoad(gvcf1, gvcf2, new PrintVariantCombiner());
     assertEquals(expectedAllVariants, allVariants);

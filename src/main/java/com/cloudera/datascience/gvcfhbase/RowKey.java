@@ -42,4 +42,12 @@ class RowKey {
         Bytes.toInt(row, CONTIG_LENGTH)
     );
   }
+
+  @Override
+  public String toString() {
+    return "RowKey{" +
+        "contig='" + contig + '\'' +
+        ", start=" + start +
+        '}';
+  }
 }

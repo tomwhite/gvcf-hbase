@@ -46,51 +46,51 @@ public class GVCFHBase {
    * @param hbaseContext the HBase context
    * @param splitSize the size (in genomic locus positions) of HBase table regions;
    *                  tables must be pre-split
+   * @param jsc the Spark context
    * @param <V> the variant type, typically {@link htsjdk.variant.variantcontext.VariantContext}
    */
   public static <V> void store(JavaRDD<V> rdd, HBaseVariantEncoder<V> variantEncoder,
-      TableName tableName, JavaHBaseContext hbaseContext, int splitSize, JavaSparkContext ctx) {
+      TableName tableName, JavaHBaseContext hbaseContext, int splitSize, JavaSparkContext jsc) {
 
     // Add the first element from the next partition. Note that this duplicates elements,
-    // but that doeesn't matter since HBase will just have duplicate cells with different
+    // but that doesn't matter since HBase will just have duplicate cells with different
     // timestamps - there will not be extra rows. The only case we need to handle is the
     // last element in the last partition.
-    JavaRDD<V> rddWithNextElt = withFirstElementFromNextPartition(ctx, rdd);
+    JavaRDD<V> rddWithNextElt = withFirstElementFromNextPartition(jsc, rdd);
 
     bulkPut(hbaseContext, rddWithNextElt, tableName, new FlatMapFunction<V, Put>() {
       V prevVariant;
       @Override
       public Iterable<Put> call(V v) throws Exception {
-        if (v == null) {
-          System.out.println("woot! last variant");
-          //return ImmutableList.of(variantEncoder.encodeNoCallFollowing(prevVariant));
-          return ImmutableList.of();
-        }
         List<Put> puts = new ArrayList<>();
-        int prevEnd = prevVariant == null ? -1 : variantEncoder.getEnd(prevVariant);
-        int start = variantEncoder.getStart(v);
-        int end = variantEncoder.getEnd(v);
-
-        if (prevVariant != null && prevEnd + 1 < start) {
-          // found a gap, so add a row with a null variant to represent a no call
-          // TODO: handle contig and split boundaries (for end of contig, always add a null)
+        if (v == null) {
           puts.add(variantEncoder.encodeNoCallFollowing(prevVariant));
-        }
-
-        int startSplitIndex = (start - 1) / splitSize; // start and end are 1-based
-        // like VCF
-        int endSplitIndex = (end - 1) / splitSize;
-        if (startSplitIndex == endSplitIndex) {
-          puts.add(variantEncoder.encodeVariant(v));
         } else {
-          // break into two variants
-          int key2Start = (startSplitIndex + 1) * splitSize + 1;
-          int key1End = key2Start - 1;
-          V[] vs = variantEncoder.split(v, key1End, key2Start);
-          puts.add(variantEncoder.encodeVariant(vs[0]));
-          puts.add(variantEncoder.encodeVariant(vs[1]));
+          int prevEnd = prevVariant == null ? -1 : variantEncoder.getEnd(prevVariant);
+          int start = variantEncoder.getStart(v);
+          int end = variantEncoder.getEnd(v);
+
+          if (prevVariant != null && prevEnd + 1 < start) {
+            // found a gap, so add a row with a null variant to represent a no call
+            // TODO: handle contig and split boundaries (for end of contig, always add a null)
+            puts.add(variantEncoder.encodeNoCallFollowing(prevVariant));
+          }
+
+          int startSplitIndex = (start - 1) / splitSize; // start and end are 1-based
+          // like VCF
+          int endSplitIndex = (end - 1) / splitSize;
+          if (startSplitIndex == endSplitIndex) {
+            puts.add(variantEncoder.encodeVariant(v));
+          } else {
+            // break into two variants
+            int key2Start = (startSplitIndex + 1) * splitSize + 1;
+            int key1End = key2Start - 1;
+            V[] vs = variantEncoder.split(v, key1End, key2Start);
+            puts.add(variantEncoder.encodeVariant(vs[0]));
+            puts.add(variantEncoder.encodeVariant(vs[1]));
+          }
+          prevVariant = v;
         }
-        prevVariant = v;
         return puts;
       }
     });
@@ -155,8 +155,11 @@ public class GVCFHBase {
                       }
                     }
                   }
+                  if (nextKeyEnd == Integer.MAX_VALUE) {
+                    continue; // all variants were null, so finish
+                  }
                   Locatable loc = new Interval(rowKey.getContig(), rowKey.getStart(), nextKeyEnd);
-                  System.out.println("combine at " + loc);
+                  //System.out.println("combine at " + loc);
                   Iterable<T> values = variantCombiner.combine(loc, variantsBySampleIndex);
                   Iterables.addAll(buffer, values);
                 } catch (Exception e) {
@@ -204,8 +207,8 @@ public class GVCFHBase {
                 try {
                   V variant = variantEncoder.decodeVariant(rowKey,
                       Iterables.getOnlyElement(result.listCells()), false);
-                  if (variantEncoder.getStart(variant) != rowKey.getStart()) { // ignore
-                    // fake variant from split
+                  if (variant == null || // ignore no call
+                      variantEncoder.getStart(variant) != rowKey.getStart()) { // ignore fake variant from split
                     continue;
                   }
                   return variant;
@@ -253,7 +256,7 @@ public class GVCFHBase {
    * For each partition, add the element from the next partition to the end. For the
    * last partition add a null.
    */
-  private static <T> JavaRDD<T> withFirstElementFromNextPartition(JavaSparkContext ctx, JavaRDD<T> rdd) {
+  private static <T> JavaRDD<T> withFirstElementFromNextPartition(JavaSparkContext jsc, JavaRDD<T> rdd) {
     int numPartitions = rdd.getNumPartitions();
     // Find the first element in each partition
     List<T> firstEltInEachPartition = rdd
@@ -265,7 +268,7 @@ public class GVCFHBase {
         numPartitions));
     firstEltInNextPartition.add(null); // the last partition does not have any elements to add to it
 
-    return rdd.zipPartitions(ctx.parallelize(firstEltInNextPartition, numPartitions),
+    return rdd.zipPartitions(jsc.parallelize(firstEltInNextPartition, numPartitions),
         (FlatMapFunction2<Iterator<T>, Iterator<T>, T>) (it1, it2) -> toIterable(Iterators.concat(it1, it2)));
   }
 
