@@ -95,5 +95,9 @@ public class TestCombineGVCFs {
         "/Users/tom/workspace/gatk/src/test/resources/large/human_g1k_v37.20.21.fasta")
         .collect();
     TestGVCF.assertEqualVariants(expectedAllVariants, allVariants);
+
+    jsc.stop();
+
+    testUtil.deleteTable(tableName);
   }
 }
