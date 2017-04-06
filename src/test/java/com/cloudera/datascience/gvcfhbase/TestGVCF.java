@@ -53,7 +53,7 @@ public class TestGVCF implements Serializable {
   public void setup() throws IOException {
     byte[][] columnFamilies = new byte[][]{GVCFHBase.SAMPLE_COLUMN_FAMILY};
     byte[][] splitKeys = new byte[][] {
-        RowKey.getSplitKeyBytes("20", splitSize + 1)};
+        GVCFHBase.getSplitKeyBytes("20", splitSize + 1)};
     HTable table = testUtil.createTable(tableName, columnFamilies, splitKeys);
   }
 
@@ -65,7 +65,7 @@ public class TestGVCF implements Serializable {
   private static class PrintVariantCombiner implements VariantCombiner<VariantContext, String> {
     @Override
     public Iterable<String> combine(Locatable loc, Iterable<VariantContext>
-        variants) {
+        variants, SampleNameIndex sampleNameIndex) {
       StringBuilder sb = new StringBuilder();
       sb.append(loc.getContig()).append(":").append(loc.getStart()).append("-")
           .append(loc.getEnd()).append(",");
@@ -96,7 +96,8 @@ public class TestGVCF implements Serializable {
   private static class SimpleMindedVariantCombiner implements VariantCombiner<VariantContext,
       VariantContext> {
     @Override
-    public Iterable<VariantContext> combine(Locatable loc, Iterable<VariantContext> v) {
+    public Iterable<VariantContext> combine(Locatable loc, Iterable<VariantContext> v,
+        SampleNameIndex sampleNameIndex) {
       List<VariantContext> variants = Lists.newArrayList(v);
       VariantContext firstVariant = variants.get(0);
       if (firstVariant.getStart() != loc.getStart()) { // ignore fake variant from split

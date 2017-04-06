@@ -1,4 +1,4 @@
-package com.cloudera.datascience.gvcfhbase;
+package com.cloudera.datascience.gvcfhbase.gatk;
 
 import com.google.common.annotations.VisibleForTesting;
 import htsjdk.samtools.util.Locatable;

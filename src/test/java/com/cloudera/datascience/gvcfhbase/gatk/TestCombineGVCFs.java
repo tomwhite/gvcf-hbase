@@ -1,5 +1,10 @@
-package com.cloudera.datascience.gvcfhbase;
+package com.cloudera.datascience.gvcfhbase.gatk;
 
+import com.cloudera.datascience.gvcfhbase.GVCFHBase;
+import com.cloudera.datascience.gvcfhbase.HBaseVariantContextEncoder;
+import com.cloudera.datascience.gvcfhbase.HBaseVariantEncoder;
+import com.cloudera.datascience.gvcfhbase.SampleNameIndex;
+import com.cloudera.datascience.gvcfhbase.TestGVCF;
 import com.google.common.collect.Iterators;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
@@ -37,7 +42,7 @@ public class TestCombineGVCFs {
   public void setup() throws IOException {
     byte[][] columnFamilies = new byte[][]{GVCFHBase.SAMPLE_COLUMN_FAMILY};
     byte[][] splitKeys = new byte[][] {
-        RowKey.getSplitKeyBytes("20", splitSize + 1)};
+        GVCFHBase.getSplitKeyBytes("20", splitSize + 1)};
     HTable table = testUtil.createTable(tableName, columnFamilies, splitKeys);
   }
 

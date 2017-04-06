@@ -37,6 +37,10 @@ public class GVCFHBase {
 
   public static final byte[] SAMPLE_COLUMN_FAMILY = Bytes.toBytes("s");
 
+  public static byte[] getSplitKeyBytes(String contig, int keyStart) {
+    return RowKey.toRowKeyBytes(contig, keyStart);
+  }
+
   /**
    * Store variants in an HBase table.
    * @param rdd the RDD of variants, typically loaded from a gVCF file.
@@ -71,12 +75,11 @@ public class GVCFHBase {
 
           if (prevVariant != null && prevEnd + 1 < start) {
             // found a gap, so add a row with a null variant to represent a no call
-            // TODO: handle contig and split boundaries (for end of contig, always add a null)
+            // TODO: handle contig boundaries (for end of contig, always add a null)
             puts.add(variantEncoder.encodeNoCallFollowing(prevVariant));
           }
 
-          int startSplitIndex = (start - 1) / splitSize; // start and end are 1-based
-          // like VCF
+          int startSplitIndex = (start - 1) / splitSize; // start and end are 1-based like VCF
           int endSplitIndex = (end - 1) / splitSize;
           if (startSplitIndex == endSplitIndex) {
             puts.add(variantEncoder.encodeVariant(v));
@@ -159,7 +162,8 @@ public class GVCFHBase {
                   }
                   Locatable loc = new Interval(rowKey.getContig(), rowKey.getStart(), nextKeyEnd);
                   //System.out.println("combine at " + loc);
-                  Iterable<T> values = variantCombiner.combine(loc, variantsBySampleIndex);
+                  Iterable<T> values = variantCombiner.combine(loc,
+                      variantsBySampleIndex, variantEncoder.getSampleNameIndex());
                   Iterables.addAll(buffer, values);
                 } catch (Exception e) {
                   throw new RuntimeException(e);

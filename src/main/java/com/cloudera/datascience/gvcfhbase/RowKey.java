@@ -25,10 +25,6 @@ class RowKey {
     return start;
   }
 
-  public static byte[] getSplitKeyBytes(String contig, int keyStart) {
-    return toRowKeyBytes(contig, keyStart);
-  }
-
   public static byte[] toRowKeyBytes(String contig, int keyStart) {
     byte[] row = new byte[CONTIG_LENGTH + Bytes.SIZEOF_INT];
     Bytes.putBytes(row, 0, Bytes.toBytes(StringUtils.leftPad(contig, 2)), 0, CONTIG_LENGTH);

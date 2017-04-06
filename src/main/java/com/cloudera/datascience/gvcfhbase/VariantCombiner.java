@@ -17,9 +17,11 @@ public interface VariantCombiner<V, T> extends Serializable {
    * @param location the range of loci to consider
    * @param variants the variants that start at the start of the location, some of
    *                 which may be null, indicating no calls
+   * @param sampleNameIndex the sample name index; useful for finding the sample name
+   *                        for no calls
    * @return zero or more combined values
    */
-  Iterable<T> combine(Locatable location, Iterable<V> variants);
+  Iterable<T> combine(Locatable location, Iterable<V> variants, SampleNameIndex sampleNameIndex);
 
   /**
    * Call to indicate that there are no more rows, so return any final values.

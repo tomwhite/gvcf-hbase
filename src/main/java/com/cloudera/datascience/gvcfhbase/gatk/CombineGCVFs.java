@@ -1,7 +1,9 @@
-package com.cloudera.datascience.gvcfhbase;
+package com.cloudera.datascience.gvcfhbase.gatk;
 
-import com.google.common.base.Function;
-import com.google.common.base.Predicate;
+import com.cloudera.datascience.gvcfhbase.GVCFHBase;
+import com.cloudera.datascience.gvcfhbase.HBaseVariantEncoder;
+import com.cloudera.datascience.gvcfhbase.SampleNameIndex;
+import com.cloudera.datascience.gvcfhbase.VariantCombiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -27,7 +29,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.StreamSupport;
-import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.spark.JavaHBaseContext;
@@ -99,29 +100,32 @@ public class CombineGCVFs {
     }
 
     @Override
-    public Iterable<VariantContext> combine(Locatable loc, Iterable<VariantContext> v) {
+    public Iterable<VariantContext> combine(Locatable loc, Iterable<VariantContext> v, SampleNameIndex sampleNameIndex) {
       ReferenceDataSource referenceDataSource = new ReferenceFileSource(new File(referencePath)); // TODO: load ref from HDFS or nio path
       ReferenceSequence ref = referenceDataSource.queryAndPrefetch(loc.getContig(), loc.getStart(), loc.getStart() + 10000);// TODO: get full reference for the partition
-      Iterable<VariantContext> variantContexts = fillInNoCalls(loc, v, ref);
-      PositionalState positionalState = new PositionalState(Lists.newArrayList(variantContexts),
-          ref.getBases(), loc);
+      List<VariantContext> variantContexts = fillInNoCalls(Lists.newArrayList(v), sampleNameIndex);
+      PositionalState positionalState = new PositionalState(variantContexts, ref.getBases(), loc);
       return reduce(positionalState, overallState);
     }
 
-    private Iterable<VariantContext> fillInNoCalls(Locatable loc,
-        Iterable<VariantContext> vcs, ReferenceSequence ref) {
+    private List<VariantContext> fillInNoCalls(List<VariantContext> vcs,
+        SampleNameIndex sampleNameIndex) {
       VariantContext variantContext = StreamSupport.stream(vcs.spliterator(), false)
-          .filter(Objects::nonNull).findFirst().get(); // TODO: shouldn't be null, but check
-      return Iterables.transform(vcs, vc -> {
+          .filter(Objects::nonNull).findFirst().get();
+      List<VariantContext> noNulls = new ArrayList<>();
+      for (int i = 0; i < vcs.size(); i++) {
+        VariantContext vc = vcs.get(i);
         if (vc != null) {
-          return vc;
+          noNulls.add(vc);
+          continue;
         }
         GenotypesContext genotypes = GenotypesContext.create();
         int ploidy = variantContext.getGenotypes().get(0).getPloidy();
-        genotypes.add(new GenotypeBuilder("NA12879").alleles // TODO: need to get sample name correctly!
-            (GATKVariantContextUtils.noCallAlleles(ploidy)).make());
-        return new VariantContextBuilder(variantContext).genotypes(genotypes).make();
-      });
+        genotypes.add(new GenotypeBuilder(sampleNameIndex.getSampleName(i))
+            .alleles(GATKVariantContextUtils.noCallAlleles(ploidy)).make());
+        noNulls.add(new VariantContextBuilder(variantContext).genotypes(genotypes).make());
+      }
+      return noNulls;
     }
 
     private Iterable<VariantContext> reduce(final PositionalState startingStates, final OverallState

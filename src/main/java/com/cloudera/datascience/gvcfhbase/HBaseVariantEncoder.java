@@ -15,6 +15,7 @@ public abstract class HBaseVariantEncoder<V> {
   public abstract Put encodeNoCallFollowing(V prevVariant) throws IOException;
   public abstract V decodeVariant(RowKey rowKey, Cell cell, boolean includeKeyAttributes) throws IOException;
   public abstract int getSampleIndex(Cell cell);
+  public abstract SampleNameIndex getSampleNameIndex();
   public abstract int getStart(V variant);
   public abstract int getEnd(V variant);
   public abstract int getKeyEnd(V variant);
