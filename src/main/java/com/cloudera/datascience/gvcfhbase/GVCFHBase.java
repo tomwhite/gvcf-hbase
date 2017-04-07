@@ -87,8 +87,9 @@ public class GVCFHBase {
           int start = variantEncoder.getStart(v);
           int end = variantEncoder.getEnd(v);
 
-          if (prevVariant == null && variantEncoder.getContig(v).equals("20") && start > 1) {
-            // first contig (TODO: find from reference dictionary)
+          String firstContig = getFirstContig(referencePath);
+          if (prevVariant == null && variantEncoder.getContig(v).equals(firstContig) && start > 1) {
+            // add a "no call header spacer" for the first contig
             V noCall = (V) noCall(variantEncoder.getContig(v), 1, start - 1,
                 sampleName, referencePath);
             puts.add(variantEncoder.encodeVariant(noCall));
@@ -117,6 +118,12 @@ public class GVCFHBase {
         return puts;
       }
     });
+  }
+
+  private static String getFirstContig(String referencePath) {
+    ReferenceDataSource referenceDataSource = new ReferenceFileSource(new File(referencePath)); // TODO: load ref from HDFS or nio path
+    return referenceDataSource.getSequenceDictionary().getSequences().get(0)
+        .getSequenceName();
   }
 
   private static VariantContext noCall(String contig, int start, int end, String
