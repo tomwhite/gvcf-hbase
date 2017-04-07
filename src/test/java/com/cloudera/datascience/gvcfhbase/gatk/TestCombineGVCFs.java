@@ -121,9 +121,12 @@ public class TestCombineGVCFs {
     SampleNameIndex sampleNameIndex = new SampleNameIndex(sampleNames);
     for (int i = 0; i < rdds.size(); i++) {
       JavaRDD<VariantContext> rdd = rdds.get(i);
+      VCFHeader vcfHeader = headers.get(i);
       HBaseVariantEncoder<VariantContext> variantEncoder =
-          new HBaseVariantContextEncoder(sampleNameIndex, headers.get(i));
-      GVCFHBase.store(rdd, variantEncoder, tableName, hbaseContext, splitSize, jsc);
+          new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader);
+      String sampleName = vcfHeader.getSampleNamesInOrder().get(0);
+      GVCFHBase.store(rdd, variantEncoder, tableName, hbaseContext, splitSize, jsc,
+          sampleName, referenceFile);
     }
 
     HBaseVariantEncoder<VariantContext> variantEncoder =

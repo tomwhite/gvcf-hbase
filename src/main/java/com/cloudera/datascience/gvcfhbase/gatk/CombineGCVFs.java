@@ -34,8 +34,6 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.spark.JavaHBaseContext;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.spark.api.java.JavaRDD;
-import org.broadinstitute.hellbender.engine.ReferenceDataSource;
-import org.broadinstitute.hellbender.engine.ReferenceFileSource;
 import org.broadinstitute.hellbender.utils.variant.GATKVCFConstants;
 import org.broadinstitute.hellbender.utils.variant.GATKVariantContextUtils;
 
@@ -101,8 +99,7 @@ public class CombineGCVFs {
 
     @Override
     public Iterable<VariantContext> combine(Locatable loc, Iterable<VariantContext> v, SampleNameIndex sampleNameIndex) {
-      ReferenceDataSource referenceDataSource = new ReferenceFileSource(new File(referencePath)); // TODO: load ref from HDFS or nio path
-      ReferenceSequence ref = referenceDataSource.queryAndPrefetch(loc.getContig(), loc.getStart(), loc.getStart() + 10000);// TODO: get full reference for the partition
+      ReferenceSequence ref = GVCFHBase.loadReference(referencePath, loc);
       List<VariantContext> variantContexts = fillInNoCalls(Lists.newArrayList(v), sampleNameIndex);
       PositionalState positionalState = new PositionalState(variantContexts, ref.getBases(), loc);
       return reduce(positionalState, overallState);

@@ -121,6 +121,11 @@ public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantConte
   }
 
   @Override
+  public String getContig(VariantContext variant) {
+    return variant.getContig();
+  }
+
+  @Override
   public int getStart(VariantContext variant) {
     return variant.getStart();
   }

@@ -3,8 +3,16 @@ package com.cloudera.datascience.gvcfhbase;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
+import htsjdk.samtools.reference.ReferenceSequence;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
+import htsjdk.variant.variantcontext.Allele;
+import htsjdk.variant.variantcontext.Genotype;
+import htsjdk.variant.variantcontext.GenotypeBuilder;
+import htsjdk.variant.variantcontext.GenotypesContext;
+import htsjdk.variant.variantcontext.VariantContext;
+import htsjdk.variant.variantcontext.VariantContextBuilder;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,6 +35,11 @@ import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.FlatMapFunction2;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
+import org.broadinstitute.hellbender.engine.ReferenceDataSource;
+import org.broadinstitute.hellbender.engine.ReferenceFileSource;
+import org.broadinstitute.hellbender.utils.SimpleInterval;
+import org.broadinstitute.hellbender.utils.variant.GATKVCFConstants;
+import org.broadinstitute.hellbender.utils.variant.GATKVariantContextUtils;
 import scala.Tuple2;
 
 /**
@@ -53,7 +66,8 @@ public class GVCFHBase {
    * @param <V> the variant type, typically {@link htsjdk.variant.variantcontext.VariantContext}
    */
   public static <V> void store(JavaRDD<V> rdd, HBaseVariantEncoder<V> variantEncoder,
-      TableName tableName, JavaHBaseContext hbaseContext, int splitSize, JavaSparkContext jsc) {
+      TableName tableName, JavaHBaseContext hbaseContext, int splitSize,
+      JavaSparkContext jsc, String sampleName, String referencePath) {
 
     // Add the first element from the next partition. Note that this duplicates elements,
     // but that doesn't matter since HBase will just have duplicate cells with different
@@ -72,6 +86,13 @@ public class GVCFHBase {
           int prevEnd = prevVariant == null ? -1 : variantEncoder.getEnd(prevVariant);
           int start = variantEncoder.getStart(v);
           int end = variantEncoder.getEnd(v);
+
+          if (prevVariant == null && variantEncoder.getContig(v).equals("20") && start > 1) {
+            // first contig (TODO: find from reference dictionary)
+            V noCall = (V) noCall(variantEncoder.getContig(v), 1, start - 1,
+                sampleName, referencePath);
+            puts.add(variantEncoder.encodeVariant(noCall));
+          }
 
           if (prevVariant != null && prevEnd + 1 < start) {
             // found a gap, so add a row with a null variant to represent a no call
@@ -96,6 +117,22 @@ public class GVCFHBase {
         return puts;
       }
     });
+  }
+
+  private static VariantContext noCall(String contig, int start, int end, String
+      sampleName, String referencePath) {
+    ReferenceSequence referenceSequence = loadReference(referencePath, new
+        SimpleInterval(contig, start, end));
+    Allele refAllele = Allele.create(referenceSequence.getBases()[0], true);
+    GenotypesContext genotypes = GenotypesContext.create();
+    genotypes.add(new GenotypeBuilder(sampleName).alleles(GATKVariantContextUtils
+        .noCallAlleles(2)).make());
+    return new VariantContextBuilder("", contig, start, end, Arrays.asList(refAllele, GATKVCFConstants.NON_REF_SYMBOLIC_ALLELE)).genotypes(genotypes).make();
+  }
+
+  private static boolean isNoCall(VariantContext variantContext) {
+    return variantContext == null ||
+        (variantContext.getGenotypes().size() == 1 && variantContext.getGenotype(0).isNoCall());
   }
 
   /**
@@ -140,14 +177,19 @@ public class GVCFHBase {
                   Tuple2<ImmutableBytesWritable, Result> row = rows.next();
                   Result result = row._2();
                   RowKey rowKey = RowKey.fromRowKeyBytes(result.getRow());
+                  //System.out.println(rowKey);
                   for (Cell cell : result.listCells()) {
                     V variant = variantEncoder.decodeVariant(rowKey, cell, true);
                     variantsBySampleIndex.set(variantEncoder.getSampleIndex(cell), variant);
                   }
                   // how many positions we can iterate over before the next row
                   int nextKeyEnd = Integer.MAX_VALUE;
+                  boolean foundVariantCall = false;
                   for (int i = 0; i < variantsBySampleIndex.size(); i++) {
                     V variant = variantsBySampleIndex.get(i);
+                    if (!isNoCall((VariantContext) variant)) {
+                      foundVariantCall = true;
+                    }
                     if (variant != null) { // a variant may be null if it's missing for this position (no call)
                       int keyEnd = variantEncoder.getKeyEnd(variant);
                       if (keyEnd >= rowKey.getStart()) {
@@ -157,11 +199,11 @@ public class GVCFHBase {
                       }
                     }
                   }
-                  if (nextKeyEnd == Integer.MAX_VALUE) {
-                    continue; // all variants were null, so finish
+                  if (!foundVariantCall) {
+                    continue; // all variants were null, so don't combine at this position
                   }
                   Locatable loc = new Interval(rowKey.getContig(), rowKey.getStart(), nextKeyEnd);
-                  System.out.println("combine at " + loc);
+                  //System.out.println("combine at " + loc);
                   Iterable<T> values = variantCombiner.combine(loc,
                       variantsBySampleIndex, variantEncoder.getSampleNameIndex());
                   Iterables.addAll(buffer, values);
@@ -210,7 +252,7 @@ public class GVCFHBase {
                 try {
                   V variant = variantEncoder.decodeVariant(rowKey,
                       Iterables.getOnlyElement(result.listCells()), false);
-                  if (variant == null || // ignore no call
+                  if (isNoCall((VariantContext) variant) || // ignore no call
                       variantEncoder.getStart(variant) != rowKey.getStart()) { // ignore fake variant from split
                     continue;
                   }
@@ -223,6 +265,12 @@ public class GVCFHBase {
           };
           return toIterable(it);
         });
+  }
+
+  public static ReferenceSequence loadReference(String referencePath, Locatable loc) {
+    ReferenceDataSource referenceDataSource = new ReferenceFileSource(new File(referencePath)); // TODO: load ref from HDFS or nio path
+    return referenceDataSource.queryAndPrefetch(loc.getContig(), loc.getStart(), loc
+        .getStart() + 10000);// TODO: get full reference for the partition
   }
 
   /**

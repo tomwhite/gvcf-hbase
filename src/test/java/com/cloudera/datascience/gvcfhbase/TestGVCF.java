@@ -41,6 +41,9 @@ public class TestGVCF implements Serializable {
 
   private static HBaseTestingUtility testUtil;
 
+  private static final String REF_PATH =
+      "/Users/tom/workspace/gatk/src/test/resources/large/human_g1k_v37.20.21.fasta";
+
   private int splitSize = 4;
   private TableName tableName = TableName.valueOf("gvcf");
 
@@ -71,7 +74,7 @@ public class TestGVCF implements Serializable {
       sb.append(loc.getContig()).append(":").append(loc.getStart()).append("-")
           .append(loc.getEnd()).append(",");
       for (VariantContext variant : variants) {
-        if (variant == null) {
+        if (isNoCall(variant)) {
           sb.append("./.,");
           continue;
         }
@@ -86,6 +89,11 @@ public class TestGVCF implements Serializable {
       }
       sb.deleteCharAt(sb.length() - 1);
       return ImmutableList.of(sb.toString());
+    }
+
+    public static boolean isNoCall(VariantContext variantContext) {
+      return variantContext == null ||
+          (variantContext.getGenotypes().size() == 1 && variantContext.getGenotype(0).isNoCall());
     }
 
     @Override
@@ -253,23 +261,21 @@ public class TestGVCF implements Serializable {
   }
 
   @Test
-  @Ignore
   // test case equivalent for the GenomicsDB test. The trouble is that gvcf2 starts
   // after gvcf1, and we don't know when the first variant in gvcf2 is (i.e. what to
-  // set nextKeyEnd to in GVCFHBase#load). To cover this case, we need a way of having a
-  // surrogate variantsBySampleIndex - perhaps by doing an initial query to find the
-  // position of the first variant in each sample for each partition.
+  // set nextKeyEnd to in GVCFHBase#load). To cover this case, add a
+  // "no call header spacer" at the beginning of contigs when storing in HBase.
   public void testNoCallAtStart() throws Exception {
     ImmutableList<VariantContext> gvcf1 = ImmutableList.of(
-        newVariantContext("20", 1, 4, "A", "<NON_REF>", "a", "0/0"));
+        newVariantContext("20", 2, 4, "A", "<NON_REF>", "a", "0/0"));
 
     ImmutableList<VariantContext> gvcf2 = ImmutableList.of(
-        newVariantContext("20", 2, 4, "G", "<NON_REF>", "b", "0/0"));
+        newVariantContext("20", 3, 4, "G", "<NON_REF>", "b", "0/0"));
 
 
     List<String> expectedAllVariants = ImmutableList.of(
-        "20:1-1,A:<NON_REF>:0/0(1-4),./.",
-        "20:2-4,A:<NON_REF>:0/0(1-4),G:<NON_REF>:0/0(2-4)");
+        "20:2-2,A:<NON_REF>:0/0(2-4),./.",
+        "20:3-4,A:<NON_REF>:0/0(2-4),G:<NON_REF>:0/0(3-4)");
 
     List<String> allVariants = storeAndLoad(gvcf1, gvcf2, new PrintVariantCombiner());
     assertEquals(expectedAllVariants, allVariants);
@@ -304,8 +310,10 @@ public class TestGVCF implements Serializable {
     );
     HBaseVariantEncoder<VariantContext> variantEncoder =
         new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader);
-    GVCFHBase.store(rdd, variantEncoder, tableName, hbaseContext, splitSize, jsc);
-    GVCFHBase.store(rdd2, variantEncoder, tableName, hbaseContext, splitSize, jsc);
+    GVCFHBase.store(rdd, variantEncoder, tableName, hbaseContext, splitSize, jsc,
+        "NA12878", REF_PATH);
+    GVCFHBase.store(rdd2, variantEncoder, tableName, hbaseContext, splitSize, jsc,
+        "b", REF_PATH);
 
     // load from HBase
     List<VariantContext> actualVariants = GVCFHBase.loadSingleSample(variantEncoder, tableName,
@@ -381,8 +389,10 @@ public class TestGVCF implements Serializable {
     VCFHeader vcfHeader = new VCFHeader(Sets.newHashSet(), sampleNames);
     HBaseVariantEncoder<VariantContext> variantEncoder =
         new HBaseVariantContextEncoder(sampleNameIndex, vcfHeader);
-    GVCFHBase.store(rdd1, variantEncoder, tableName, hbaseContext, splitSize, jsc);
-    GVCFHBase.store(rdd2, variantEncoder, tableName, hbaseContext, splitSize, jsc);
+    GVCFHBase.store(rdd1, variantEncoder, tableName, hbaseContext, splitSize, jsc,
+        "a", REF_PATH);
+    GVCFHBase.store(rdd2, variantEncoder, tableName, hbaseContext, splitSize, jsc,
+        "b", REF_PATH);
 
     // load from HBase
     List<T> allVariants = GVCFHBase.load(variantEncoder, tableName, hbaseContext, variantCombiner)
