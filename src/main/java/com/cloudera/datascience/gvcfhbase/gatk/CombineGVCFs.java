@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.StreamSupport;
 import org.apache.commons.lang.StringUtils;
@@ -37,14 +36,14 @@ import org.broadinstitute.hellbender.utils.variant.GATKVCFConstants;
 import org.broadinstitute.hellbender.utils.variant.GATKVariantContextUtils;
 
 /**
- * This is a HBase and Spark verion of GATK3's CombineGCVFs.
+ * This is a HBase and Spark verion of GATK3's CombineGVCFs.
  * It is untested, and actually is probably a long way off working. The basic structure
  * of the code is basically right. There are probably lots of edge cases to get right
  * around partition boundaries in HBase. There are also issues around licensing and
  * getting test cases. Finally, this was a speculative project - there is currently no
  * user demand for this feature.
  */
-public class CombineGCVFs {
+public class CombineGVCFs {
 
   public static JavaRDD<VariantContext> combine(HBaseVariantEncoder<VariantContext> variantEncoder,
       TableName tableName, JavaHBaseContext hbaseContext, String referencePath) {
@@ -56,7 +55,7 @@ public class CombineGCVFs {
     // What we can do is run a mapPartitions, and do the aggregation in there, so there
     // is one OverallState per partition.
     return GVCFHBase.load(variantEncoder, tableName, hbaseContext,
-        new CombineGCVFsVariantCombiner(referencePath));
+        new CombineGVCFsVariantCombiner(referencePath));
   }
 
   private static class PositionalState {
@@ -83,7 +82,7 @@ public class CombineGCVFs {
     public OverallState() {}
   }
 
-  public static class CombineGCVFsVariantCombiner implements VariantCombiner<VariantContext, VariantContext> {
+  public static class CombineGVCFsVariantCombiner implements VariantCombiner<VariantContext, VariantContext> {
 
     private boolean USE_BP_RESOLUTION = false;
 
@@ -92,7 +91,7 @@ public class CombineGCVFs {
     private final OverallState overallState = new OverallState();
     private String referencePath;
 
-    public CombineGCVFsVariantCombiner(String referencePath) {
+    public CombineGVCFsVariantCombiner(String referencePath) {
       this.referencePath = referencePath;
     }
 

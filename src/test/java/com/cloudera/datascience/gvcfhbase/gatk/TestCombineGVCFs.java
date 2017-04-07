@@ -65,12 +65,12 @@ public class TestCombineGVCFs {
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][] {
-//        { ImmutableList.of("src/test/resources/g.vcf", "src/test/resources/g2.vcf"),
-//            "src/test/resources/g1g2.vcf",
-//            "/Users/tom/workspace/gatk/src/test/resources/large/human_g1k_v37.20.21.fasta" },
-//        { ImmutableList.of("src/test/resources/g.vcf", "src/test/resources/g3.vcf"),
-//            "src/test/resources/g1g3.vcf",
-//            "/Users/tom/workspace/gatk/src/test/resources/large/human_g1k_v37.20.21.fasta" },
+        { ImmutableList.of("src/test/resources/g.vcf", "src/test/resources/g2.vcf"),
+            "src/test/resources/g1g2.vcf",
+            "/Users/tom/workspace/gatk/src/test/resources/large/human_g1k_v37.20.21.fasta" },
+        { ImmutableList.of("src/test/resources/g.vcf", "src/test/resources/g3.vcf"),
+            "src/test/resources/g1g3.vcf",
+            "/Users/tom/workspace/gatk/src/test/resources/large/human_g1k_v37.20.21.fasta" },
         // TODO: investigate failing test and fix
 //        { ImmutableList.of("src/test/resources/g.vcf", "src/test/resources/g4.vcf"),
 //            "src/test/resources/g1g4.vcf",
@@ -131,7 +131,7 @@ public class TestCombineGVCFs {
 
     HBaseVariantEncoder<VariantContext> variantEncoder =
         new HBaseVariantContextEncoder(sampleNameIndex, headers.get(0));
-    List<VariantContext> allVariants = CombineGCVFs.combine(variantEncoder, tableName, hbaseContext,
+    List<VariantContext> allVariants = CombineGVCFs.combine(variantEncoder, tableName, hbaseContext,
         referenceFile)
         .collect();
 
