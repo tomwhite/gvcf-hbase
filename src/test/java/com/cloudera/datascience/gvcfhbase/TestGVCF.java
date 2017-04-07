@@ -267,15 +267,19 @@ public class TestGVCF implements Serializable {
   // "no call header spacer" at the beginning of contigs when storing in HBase.
   public void testNoCallAtStart() throws Exception {
     ImmutableList<VariantContext> gvcf1 = ImmutableList.of(
-        newVariantContext("20", 2, 4, "A", "<NON_REF>", "a", "0/0"));
+        newVariantContext("20", 2, 4, "A", "<NON_REF>", "a", "0/0"),
+        newVariantContext("20", 6, 6, "G", "C", "a", "0/1"));
 
     ImmutableList<VariantContext> gvcf2 = ImmutableList.of(
-        newVariantContext("20", 3, 4, "G", "<NON_REF>", "b", "0/0"));
+        newVariantContext("20", 3, 3, "G", "<NON_REF>", "b", "0/0"),
+        newVariantContext("20", 6, 6, "G", "C", "b", "1/1"));
 
 
     List<String> expectedAllVariants = ImmutableList.of(
         "20:2-2,A:<NON_REF>:0/0(2-4),./.",
-        "20:3-4,A:<NON_REF>:0/0(2-4),G:<NON_REF>:0/0(3-4)");
+        "20:3-3,A:<NON_REF>:0/0(2-4),G:<NON_REF>:0/0(3-3)",
+        "20:4-4,A:<NON_REF>:0/0(2-4),./.",
+        "20:6-6,G:C:0/1(6-6),G:C:1/1(6-6)");
 
     List<String> allVariants = storeAndLoad(gvcf1, gvcf2, new PrintVariantCombiner());
     assertEquals(expectedAllVariants, allVariants);
