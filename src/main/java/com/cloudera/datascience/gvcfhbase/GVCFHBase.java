@@ -137,7 +137,7 @@ public class GVCFHBase {
     return new VariantContextBuilder("", contig, start, end, Arrays.asList(refAllele, GATKVCFConstants.NON_REF_SYMBOLIC_ALLELE)).genotypes(genotypes).make();
   }
 
-  private static boolean isNoCall(VariantContext variantContext) {
+  public static boolean isNoCall(VariantContext variantContext) {
     return variantContext == null ||
         (variantContext.getGenotypes().size() == 1 && variantContext.getGenotype(0).isNoCall());
   }

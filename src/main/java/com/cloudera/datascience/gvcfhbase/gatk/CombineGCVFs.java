@@ -17,7 +17,6 @@ import htsjdk.variant.variantcontext.GenotypesContext;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
 import htsjdk.variant.vcf.VCFConstants;
-import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -108,14 +107,15 @@ public class CombineGCVFs {
     private List<VariantContext> fillInNoCalls(List<VariantContext> vcs,
         SampleNameIndex sampleNameIndex) {
       VariantContext variantContext = StreamSupport.stream(vcs.spliterator(), false)
-          .filter(Objects::nonNull).findFirst().get();
+          .filter(vc -> !GVCFHBase.isNoCall(vc)).findFirst().get();
       List<VariantContext> noNulls = new ArrayList<>();
       for (int i = 0; i < vcs.size(); i++) {
         VariantContext vc = vcs.get(i);
-        if (vc != null) {
+        if (!GVCFHBase.isNoCall(vc)) {
           noNulls.add(vc);
           continue;
         }
+        // replace no call with a no call for this actual variant
         GenotypesContext genotypes = GenotypesContext.create();
         int ploidy = variantContext.getGenotypes().get(0).getPloidy();
         genotypes.add(new GenotypeBuilder(sampleNameIndex.getSampleName(i))
