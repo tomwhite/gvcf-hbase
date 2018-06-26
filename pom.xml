@@ -50,20 +50,9 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.seqdoop</groupId>
-      <artifactId>hadoop-bam</artifactId>
-      <version>7.7.1-SNAPSHOT</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.seqdoop</groupId>
-          <artifactId>htsjdk</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
       <groupId>org.broadinstitute</groupId>
       <artifactId>gatk</artifactId>
-      <version>4.alpha.2-189-g056f196-20170404.231309-1</version>
+      <version>4.beta.1</version>
       <exclusions>
         <!-- exclude all gatk transitive dependencies: pull in any that are needed by
         hand -->

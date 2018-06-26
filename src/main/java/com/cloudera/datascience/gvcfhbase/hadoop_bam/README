@@ -1,0 +1,1 @@
+Copied from Hadoop-BAM and LazyParsingGenotypesContext#Parser is made transient so it can be used in Spark.

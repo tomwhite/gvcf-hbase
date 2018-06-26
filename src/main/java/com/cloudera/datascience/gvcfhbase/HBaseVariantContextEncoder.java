@@ -1,5 +1,8 @@
 package com.cloudera.datascience.gvcfhbase;
 
+import com.cloudera.datascience.gvcfhbase.hadoop_bam.LazyVCFGenotypesContext;
+import com.cloudera.datascience.gvcfhbase.hadoop_bam.VariantContextCodec;
+import com.cloudera.datascience.gvcfhbase.hadoop_bam.VariantContextWithHeader;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -18,9 +21,6 @@ import java.util.Map;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.seqdoop.hadoop_bam.LazyVCFGenotypesContext;
-import org.seqdoop.hadoop_bam.VariantContextCodec;
-import org.seqdoop.hadoop_bam.VariantContextWithHeader;
 
 public class HBaseVariantContextEncoder extends HBaseVariantEncoder<VariantContext>
     implements Serializable {
