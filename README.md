@@ -34,6 +34,15 @@ in HBase.
 Note that a sample may not have a particular variant, in which case you'll just see the
 non-variant records at that position.
 
+## Applications
+
+`CombineGVCFs` is a GATK program that takes a list of GVCF files and combines them into one.
+As a proof-of-concept CombineGVCFs was ported to run on the HBase store.
+
+1. GVCF data is written to the store (e.g. by `HaplotypeCaller` programs), possibly in parallel.
+2. `CombineGVCFs` is run against the store to produce a `RDD<VariantContext>`, whcih can be written
+as a single GVCF file, or passed to later parts of the pipeline (e.g. genotyping).
+
 ## Design
 
 ### Encoding
@@ -47,17 +56,32 @@ Row keys are made up of the following fields:
 1. the contig
 2. the base pair position
 
-[TODO: describe how row keys are encoded]
+Row keys are encoded (using the HBase [Bytes](https://hbase.apache.org/apidocs/org/apache/hadoop/hbase/util/Bytes.html) class) as follows:
+
+1. the contig (2 characters or less, e.g. "22" or "X") is left padded and converted to two bytes.
+2. the base pair position is written as a four-byte integer.
+
+Therefore keys will be sorted by contig, then position within contig.
+
+Each HBase cell contains a variant, represented by an htsjdk `VariantContext` instance.
 
 ### Splits
 
-Tables in HBase are split into regions. This can be done automatically, but this design
-relies on the tables being pre-split. Split points are chosen every N base pair 
+Tables in HBase are split into regions. This can be done automatically, but the design
+here relies on the tables being pre-split. Split points are chosen every N base pair 
 positions, where N is chosen before loading a batch, and must be the same for every 
 sample loaded in a batch.
 
-For example, suppose N=4, and the following is the GVCF file for the first sample (some
-fields have been dropped for simplicity):
+It must be possible to find the variant at every location in a split, without reading
+the preceding or following split. This allows each split to be processed independently
+of the others. To achieve this, extra rows are added as follows:
+
+1. Break `NON_REF` blocks that cross splits.
+2. Add "no call header spacers" if there is no variant at the start of the split.
+3. Add "no call" at the start of any run of locations with no variant information.
+
+For example, to illustrate 1 suppose N=4, and the following is the GVCF file for
+the first sample (some fields have been dropped for simplicity):
 
 ```
 #CHROM POS REF ALT INFO SAMPLE
@@ -67,7 +91,16 @@ fields have been dropped for simplicity):
 ```
 
 The block from 2 to 7 will be split into two when it is stored in HBase, since it 
-overlaps the 4 split point. This allows the process reading the second split (which 
+overlaps the 4 split point. Conceptually, this looks like this:
+
+```
+Split 1 | 1-1 A:G
+        | 2-4 G:<NON_REF>
+Split 2 | 5-7 G:<NON_REF>
+        | 8-8 G:C
+```
+
+This allows the process reading the second split (which 
 starts at position 5) to access information at positions 5, 6, and 7 in the block, 
 which would not have been possible otherwise if the block has not been split, since the
 record would have been only readable from the previous partition.
